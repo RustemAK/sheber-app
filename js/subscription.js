@@ -117,11 +117,11 @@ export function setupSubscriptionModalListeners() {
       if (months === '12') planName = '12 месяцев (24 900 ₸)';
 
       const master = state.currentMaster || {};
-      const salon = master.salon_name || safeStorage.get('hairstudio_studio_name', 'HairStudio');
+      const salon = master.salon_name || safeStorage.get('sheber_studio_name') || safeStorage.get('hairstudio_studio_name', 'Sheber');
       const name = master.name || 'Мастер';
       const slug = master.slug || safeStorage.get('hairstudio_master_slug', 'demo');
 
-      const waMsg = `Здравствуйте! Я оплатил(а) подписку HairStudio.\n\n✂️ Салон: ${salon}\n👤 Мастер: ${name}\n🌐 Адрес ссылки: /book.html?m=${slug}\n⭐ Выбранный тариф: ${planName}\n\nПрикрепляю чек/квитанцию перевода Kaspi:`;
+      const waMsg = `Здравствуйте! Я оплатил(а) подписку Sheber Pro.\n\n✂️ Салон: ${salon}\n👤 Мастер: ${name}\n🌐 Адрес ссылки: /book.html?m=${slug}\n⭐ Выбранный тариф: ${planName}\n\nПрикрепляю чек/квитанцию перевода Kaspi:`;
       const waUrl = `https://wa.me/77079372624?text=${encodeURIComponent(waMsg)}`;
       window.open(waUrl, '_blank');
     });

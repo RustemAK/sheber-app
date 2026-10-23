@@ -112,9 +112,16 @@ export function renderFinance() {
   }
 }
 
-export function renderExpenses() {
+let expensesCurrentPage = 1;
+const EXPENSES_PER_PAGE = 30;
+
+export function renderExpenses(resetPagination = true) {
   const container = document.getElementById('expensesList');
   if (!container) return;
+  
+  if (resetPagination) {
+    expensesCurrentPage = 1;
+  }
   container.innerHTML = '';
 
   const now = new Date();
@@ -158,8 +165,11 @@ export function renderExpenses() {
     });
   }
 
+  const totalCount = list.length;
+  const visibleList = list.slice(0, expensesCurrentPage * EXPENSES_PER_PAGE);
+
   const fragment = document.createDocumentFragment();
-  list.forEach(exp => {
+  visibleList.forEach(exp => {
     const card = document.createElement('div');
     card.className = 'data-item-card';
     card.style.cursor = 'pointer';
@@ -181,6 +191,19 @@ export function renderExpenses() {
     fragment.appendChild(card);
   });
   container.appendChild(fragment);
+
+  // Pagination button
+  if (visibleList.length < totalCount) {
+    const loadMoreBtn = document.createElement('button');
+    loadMoreBtn.className = 'btn-secondary';
+    loadMoreBtn.style.cssText = 'width: 100%; margin: 12px 0 24px; padding: 12px; font-size: 13px; font-weight: 600;';
+    loadMoreBtn.innerText = `Показать ещё (${totalCount - visibleList.length})`;
+    loadMoreBtn.onclick = () => {
+      expensesCurrentPage++;
+      renderExpenses(false);
+    };
+    container.appendChild(loadMoreBtn);
+  }
 }
 
 export function openExpenseModal(exp = null) {
@@ -238,6 +261,11 @@ export async function handleExpenseSubmit(e, onDataChanged) {
 
   if (window.closeModal) window.closeModal('modalExpense');
   if (typeof onDataChanged === 'function') await onDataChanged();
+
+  if (window.HairSupabase && window.HairSupabase.syncMasterExpenses) {
+    const masterId = state.currentMaster ? state.currentMaster.id : null;
+    if (masterId) window.HairSupabase.syncMasterExpenses(masterId, state.expenses).catch(console.warn);
+  }
 }
 
 export async function handleExpenseDelete(onDataChanged) {
@@ -247,5 +275,10 @@ export async function handleExpenseDelete(onDataChanged) {
     if (window.closeModal) window.closeModal('modalExpense');
     showToast('Расход удален');
     if (typeof onDataChanged === 'function') await onDataChanged();
+
+    if (window.HairSupabase && window.HairSupabase.syncMasterExpenses) {
+      const masterId = state.currentMaster ? state.currentMaster.id : null;
+      if (masterId) window.HairSupabase.syncMasterExpenses(masterId, state.expenses).catch(console.warn);
+    }
   }
 }

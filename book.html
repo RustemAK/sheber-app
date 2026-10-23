@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-  <title>Онлайн-запись — HairStudio</title>
+  <title>Онлайн-запись — Sheber</title>
   <meta name="description" content="Удобная онлайн-запись к мастеру без регистрации и скачивания приложений">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co;">
 
@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/book.css?v=30">
+  <link rel="stylesheet" href="css/book.css?v=36">
 </head>
 <body>
 
@@ -33,7 +33,7 @@
           <h1 class="master-title">
             <span id="masterName">Загрузка мастера...</span>
           </h1>
-          <div class="master-salon" id="masterSalon">HairStudio</div>
+          <div class="master-salon" id="masterSalon">Sheber</div>
           <a href="#" id="linkMasterLocation" class="master-location" target="_blank" rel="noopener" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); cursor: pointer;" title="Открыть адрес в 2ГИС">
             <span>📍</span> <span id="masterAddress">Алматы, пр. Абая 150</span> <span style="font-size: 11px; color: #22c55e; font-weight: 600; margin-left: 2px;">(2ГИС ↗)</span>
           </a>
@@ -138,7 +138,24 @@
           <label class="form-label" for="clientNoteInput">Пожелание или комментарий (необязательно)</label>
           <textarea id="clientNoteInput" class="form-textarea" placeholder="Длина волос, пожелания или вопросы..."></textarea>
         </div>
+
+        <!-- Anti-spam Honeypot field (hidden from real users, filled by bots) -->
+        <div style="display:none !important; visibility:hidden !important; opacity:0; position:absolute; left:-9999px; height:0; width:0; overflow:hidden;" aria-hidden="true">
+          <label for="clientWebsiteTrap">Website</label>
+          <input type="text" id="clientWebsiteTrap" name="client_website_trap" tabindex="-1" autocomplete="off">
+        </div>
       </section>
+
+      <!-- Viral Growth Branding -->
+      <footer class="booking-viral-footer" style="text-align: center; margin: 32px 0 110px; padding: 18px 12px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted);">
+        <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">
+          ⚡ Работает на платформе <span style="color: var(--accent-gold-light); font-weight: 700;">Sheber</span>
+        </div>
+        <div>Онлайн-запись и учет для бьюти-мастеров и салонов</div>
+        <a href="index.html" style="display: inline-block; margin-top: 8px; color: var(--accent-gold-light); font-weight: 700; text-decoration: none; font-size: 13px;">
+          Создать онлайн-запись для себя за 1 минуту →
+        </a>
+      </footer>
     </div>
 
   </div>
@@ -199,7 +216,7 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/supabase-sync.js?v=30"></script>
-  <script src="js/book.js?v=30"></script>
+  <script src="js/supabase-sync.js?v=36"></script>
+  <script src="js/book.js?v=36"></script>
 </body>
 </html>

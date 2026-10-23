@@ -282,7 +282,7 @@
 
           <div class="right-tools">
             ${waPhone ? `
-              <a href="https://wa.me/${waPhone}?text=${encodeURIComponent(`Здравствуйте, ${m.name}! Напоминаем по поводу подписки на сервис онлайн-записи HairStudio для салона "${m.salon_name}".`)}" 
+              <a href="https://wa.me/${waPhone}?text=${encodeURIComponent(`Здравствуйте, ${m.name}! Напоминаем по поводу подписки на сервис онлайн-записи Sheber для салона "${m.salon_name}".`)}" 
                  target="_blank" class="btn-tool whatsapp" title="Написать в WhatsApp">
                 💬 WhatsApp
               </a>

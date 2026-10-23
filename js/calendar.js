@@ -4,7 +4,7 @@
  * Handles date navigation, hourly timeline, appointment cards, conflict checking and CRUD modals.
  */
 
-import { state } from './state.js';
+import { state, getAppointmentsForDate } from './state.js';
 import { 
   escapeHtml, 
   parseYMD, 
@@ -49,13 +49,11 @@ export function setupDateStrip(baseDate = null) {
   const center = baseDate instanceof Date ? baseDate : activeDate;
   const fragment = document.createDocumentFragment();
 
-  const appDates = new Set(state.appointments.map(a => a.date));
-
   for (let i = -10; i <= 14; i++) {
     const d = new Date(center);
     d.setDate(center.getDate() + i);
     const dateStr = formatDateToYMD(d);
-    const hasApps = appDates.has(dateStr);
+    const hasApps = getAppointmentsForDate(dateStr).length > 0;
     const isActive = dateStr === state.selectedDate;
 
     const card = document.createElement('div');
@@ -91,9 +89,9 @@ export function setupDateStrip(baseDate = null) {
 export function renderDateStripDots() {
   const strip = document.getElementById('dateStrip');
   if (!strip) return;
-  const appDates = new Set(state.appointments.map(a => a.date));
   strip.querySelectorAll('.date-card').forEach(card => {
-    card.classList.toggle('has-appointments', appDates.has(card.dataset.date));
+    const hasApps = getAppointmentsForDate(card.dataset.date).length > 0;
+    card.classList.toggle('has-appointments', hasApps);
   });
 }
 
@@ -660,5 +658,18 @@ export async function triggerAutoSyncSlots() {
     await window.HairSupabase.syncMasterBusySlots(masterId, state.appointments);
   } catch (err) {
     console.warn('Auto-sync slots error:', err);
+  }
+
+  if (masterId) {
+    if (window.HairSupabase.syncMasterAppointments) {
+      window.HairSupabase.syncMasterAppointments(masterId, state.appointments).catch(err => {
+        console.warn('Cloud sync master appointments failed:', err);
+      });
+    }
+    if (window.HairSupabase.syncMasterClients) {
+      window.HairSupabase.syncMasterClients(masterId, state.clients).catch(err => {
+        console.warn('Cloud sync master clients failed:', err);
+      });
+    }
   }
 }

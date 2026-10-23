@@ -422,6 +422,7 @@ export function updateAuthUI(isLoggedIn) {
   const profileAvatar = document.getElementById('authProfileAvatar');
 
   if (isLoggedIn && (state.currentUser || state.currentMaster)) {
+    setupRealtimeBookings();
     const master = state.currentMaster || {};
     const user = state.currentUser || {};
     const displayName = master.name || (user.email ? user.email.split('@')[0] : 'Мастер');
@@ -468,6 +469,10 @@ export function updateAuthUI(isLoggedIn) {
     // Render Subscription status badge
     renderSubscriptionStatus(master);
   } else {
+    if (realtimeBookingsSubscription && typeof realtimeBookingsSubscription.unsubscribe === 'function') {
+      try { realtimeBookingsSubscription.unsubscribe(); } catch (e) {}
+      realtimeBookingsSubscription = null;
+    }
     if (btnAuthProfile) {
       btnAuthProfile.title = 'Войти в кабинет мастера';
       btnAuthProfile.innerHTML = '👤';
@@ -570,6 +575,9 @@ export async function handleSignIn(e) {
 
     await checkOnlineBookings(false);
     triggerAutoSyncSlots();
+    if (res.master && res.master.id) {
+      checkAndRestoreCloudData(res.master.id).catch(console.warn);
+    }
   } catch (err) {
     const errMsg = `Ошибка авторизации: ${err.message || 'Сбой подключения'}`;
     if (errorAlert && errorText) {
@@ -1106,6 +1114,24 @@ export async function checkOnlineBookings(notify = false) {
   }
 }
 
+let realtimeBookingsSubscription = null;
+
+export function setupRealtimeBookings() {
+  const masterId = state.currentMaster ? state.currentMaster.id : null;
+  if (!masterId || !window.HairSupabase || !window.HairSupabase.subscribeBookingRequests) {
+    return;
+  }
+
+  if (realtimeBookingsSubscription && typeof realtimeBookingsSubscription.unsubscribe === 'function') {
+    try { realtimeBookingsSubscription.unsubscribe(); } catch (e) {}
+  }
+
+  realtimeBookingsSubscription = window.HairSupabase.subscribeBookingRequests(masterId, (newBooking) => {
+    console.log('⚡ Realtime: Получена новая онлайн-заявка!', newBooking);
+    checkOnlineBookings(false);
+  });
+}
+
 export function renderBookingsList() {
   const container = document.getElementById('bookingsList');
   if (!container) return;
@@ -1306,7 +1332,16 @@ export async function checkAndRunAutoBackup() {
 export async function createAutoBackup(silent = false) {
   try {
     const jsonString = await window.db.exportAllData();
-    safeStorage.set('hairstudio_autobackup_data', jsonString);
+    // Save full snapshot in IndexedDB (no 5MB quota limits, highly scalable)
+    if (window.db && window.db.saveBackup) {
+      await window.db.saveBackup(jsonString);
+      // Clean up legacy localStorage storage key to free up browser quota
+      safeStorage.remove('hairstudio_autobackup_data');
+      safeStorage.set('hairstudio_has_idb_backup', 'true');
+    } else {
+      safeStorage.set('hairstudio_autobackup_data', jsonString);
+    }
+
     const nowIso = new Date().toISOString();
     safeStorage.set('hairstudio_last_backup_time', nowIso);
 
@@ -1328,7 +1363,25 @@ export async function createAutoBackup(silent = false) {
 }
 
 export async function restoreFromAutoBackup() {
-  const backupJson = safeStorage.get('hairstudio_autobackup_data');
+  let backupJson = null;
+
+  // 1. Try reading from reliable IndexedDB backups
+  try {
+    if (window.db && window.db.getLatestBackup) {
+      const latest = await window.db.getLatestBackup();
+      if (latest && latest.data) {
+        backupJson = latest.data;
+      }
+    }
+  } catch (err) {
+    console.warn('IDB getLatestBackup error, checking localStorage fallback:', err);
+  }
+
+  // 2. Fallback to legacy localStorage copy if IDB is empty
+  if (!backupJson) {
+    backupJson = safeStorage.get('hairstudio_autobackup_data');
+  }
+
   if (!backupJson) {
     showToast('Автокопия не найдена', 'error');
     return;
@@ -1371,8 +1424,9 @@ export function updateAutoBackupUI() {
     const btnRestore = document.getElementById('btnRestoreAutoBackup');
 
     const lastBackup = safeStorage.get('hairstudio_last_backup_time');
-    const backupData = safeStorage.get('hairstudio_autobackup_data');
-    const hasData = Boolean(backupData);
+    const hasIdbBackup = safeStorage.get('hairstudio_has_idb_backup') === 'true';
+    const hasLegacyData = Boolean(safeStorage.get('hairstudio_autobackup_data'));
+    const hasData = hasIdbBackup || hasLegacyData;
 
     if (btnRestore) {
       btnRestore.disabled = !hasData;
@@ -1412,6 +1466,61 @@ export function updateAutoBackupUI() {
   }
 }
 
+export async function checkAndRestoreCloudData(masterId, force = false) {
+  if (!masterId || !window.HairSupabase || !window.HairSupabase.downloadMasterCloudData) return;
+
+  const localApps = state.appointments || [];
+  const localClients = state.clients || [];
+
+  // If not force, only auto-restore on clean install / empty local state
+  if (!force && (localApps.length > 0 || localClients.length > 0)) {
+    return;
+  }
+
+  try {
+    const data = await window.HairSupabase.downloadMasterCloudData(masterId);
+    if (!data) return;
+
+    let restoredCount = 0;
+
+    if (Array.isArray(data.clients) && data.clients.length > 0) {
+      for (const c of data.clients) {
+        await window.db.saveClientIfNotExists(c);
+      }
+      restoredCount += data.clients.length;
+    }
+
+    if (Array.isArray(data.appointments) && data.appointments.length > 0) {
+      for (const a of data.appointments) {
+        await window.db.syncAppointmentFromCloud(a);
+      }
+      restoredCount += data.appointments.length;
+    }
+
+    if (Array.isArray(data.expenses) && data.expenses.length > 0) {
+      const existingExpenses = await window.db.getExpenses();
+      for (const exp of data.expenses) {
+        const exists = existingExpenses.some(e => e.date === exp.date && e.title === exp.title && Number(e.amount) === Number(exp.amount));
+        if (!exists) {
+          await window.db.addExpense(exp);
+          restoredCount++;
+        }
+      }
+    }
+
+    if (restoredCount > 0) {
+      await reloadData();
+      setupDateStrip();
+      showToast(`☁️ Синхронизировано из облака (${restoredCount} записей)`, 'success');
+    } else if (force) {
+      showToast('В облаке нет сохраненных записей', 'info');
+    }
+  } catch (err) {
+    console.warn('checkAndRestoreCloudData error:', err);
+    if (force) showToast('Ошибка синхронизации с облаком', 'error');
+  }
+}
+
 export async function handleExportBackup() {
   try {
     const jsonString = await window.db.exportAllData();
@@ -1420,7 +1529,7 @@ export async function handleExportBackup() {
     const a = document.createElement('a');
     const dateStr = formatDateToYMD(new Date());
     a.href = url;
-    a.download = `HairStudio_Backup_${dateStr}.json`;
+    a.download = `Sheber_Backup_${dateStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showToast('Резервная копия сохранена в загрузки');
@@ -1461,20 +1570,21 @@ export async function handleResetDemo() {
 
 // ================= THEME & CUSTOM BRANDING =================
 export function loadStudioName() {
-  const savedName = safeStorage.get('hairstudio_studio_name', 'HairStudio');
+  const savedName = safeStorage.get('sheber_studio_name') || safeStorage.get('hairstudio_studio_name') || 'Sheber';
   const headerElem = document.getElementById('headerStudioName');
   if (headerElem) headerElem.innerText = savedName;
 
   const inputElem = document.getElementById('settingStudioName');
   if (inputElem) inputElem.value = savedName;
 
-  document.title = `${savedName} — Запись клиентов и Учет`;
+  document.title = `${savedName} — Онлайн-запись и Учет`;
 }
 
 export async function handleSaveStudioName() {
   const inputElem = document.getElementById('settingStudioName');
   if (!inputElem) return;
-  const newName = inputElem.value.trim() || 'HairStudio';
+  const newName = inputElem.value.trim() || 'Sheber';
+  safeStorage.set('sheber_studio_name', newName);
   safeStorage.set('hairstudio_studio_name', newName);
   state.studioName = newName;
   loadStudioName();
@@ -2116,6 +2226,34 @@ function setupEventListeners() {
   const btnRestoreAuto = document.getElementById('btnRestoreAutoBackup');
   if (btnRestoreAuto) btnRestoreAuto.addEventListener('click', restoreFromAutoBackup);
 
+  const btnSyncCloud = document.getElementById('btnSyncCloudData');
+  if (btnSyncCloud) {
+    btnSyncCloud.addEventListener('click', async () => {
+      const masterId = state.currentMaster ? state.currentMaster.id : null;
+      if (!masterId) {
+        showToast('Для облачной синхронизации необходимо войти в аккаунт мастера', 'warning');
+        openModal('modalAuth');
+        return;
+      }
+      btnSyncCloud.disabled = true;
+      const originalText = btnSyncCloud.innerText;
+      btnSyncCloud.innerText = '⏳ Синхронизация...';
+      try {
+        await checkAndRestoreCloudData(masterId, true);
+        if (window.HairSupabase) {
+          await Promise.all([
+            window.HairSupabase.syncMasterClients ? window.HairSupabase.syncMasterClients(masterId, state.clients).catch(console.warn) : null,
+            window.HairSupabase.syncMasterAppointments ? window.HairSupabase.syncMasterAppointments(masterId, state.appointments).catch(console.warn) : null,
+            window.HairSupabase.syncMasterExpenses ? window.HairSupabase.syncMasterExpenses(masterId, state.expenses).catch(console.warn) : null
+          ]);
+        }
+      } finally {
+        btnSyncCloud.disabled = false;
+        btnSyncCloud.innerText = originalText;
+      }
+    });
+  }
+
   const intervalSelect = document.getElementById('settingAutoBackupInterval');
   if (intervalSelect) {
     intervalSelect.addEventListener('change', (e) => {
@@ -2351,14 +2489,22 @@ function initApp() {
     try {
       await window.db.init();
 
-      initMasterAuth().then(() => {
+      try {
+        await initMasterAuth();
         loadOnlineBookingSettings();
-      }).catch(console.warn);
+        setupRealtimeBookings();
+      } catch (authErr) {
+        console.warn('initMasterAuth failed:', authErr);
+      }
 
       await reloadData();
       setupDateStrip();
       setupServiceWorker();
       restoreActiveTabAndScroll();
+
+      if (state.currentMaster && state.currentMaster.id) {
+        checkAndRestoreCloudData(state.currentMaster.id).catch(console.warn);
+      }
 
       checkAndRunAutoBackup().catch(console.warn);
       checkOnlineBookings(false).catch(console.warn);
@@ -2392,6 +2538,7 @@ function initApp() {
 window.app = {
   state,
   reloadData,
+  checkAndRestoreCloudData,
   openModal,
   closeModal,
   openAppointmentModal,

@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>HairStudio Admin • Панель управления платформой</title>
+  <title>Sheber Admin • Панель управления платформой</title>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co;">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="css/style.css?v=30">
-  <link rel="stylesheet" href="css/admin.css?v=30">
+  <link rel="stylesheet" href="css/style.css?v=36">
+  <link rel="stylesheet" href="css/admin.css?v=36">
 </head>
 <body>
 
@@ -19,7 +19,7 @@
   <header class="admin-navbar">
     <div class="admin-navbar-inner">
       <div class="admin-brand">
-        <h1>👑 HairStudio <span class="badge-admin">Super-Admin</span></h1>
+        <h1>👑 Sheber <span class="badge-admin">Super-Admin</span></h1>
       </div>
       <div class="admin-actions">
         <button class="admin-btn" id="btnOpenPaymentsModal" title="Журнал платежей">
@@ -41,13 +41,13 @@
       <div class="auth-gate-icon">🔒</div>
       <h2 style="font-family: 'Cinzel', serif; font-size: 22px; margin-bottom: 8px;">Вход в панель управления</h2>
       <p style="font-size: 13px; color: #9ca3af; margin-bottom: 20px;">
-        Доступ только для владельца платформы HairStudio. Войдите под учетной записью администратора.
+        Доступ только для владельца платформы Sheber. Войдите под учетной записью администратора.
       </p>
 
       <form id="formAdminLogin" style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
         <div>
           <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Email администратора</label>
-          <input type="email" id="adminLoginEmail" class="search-input" placeholder="admin@hairstudio.kz" required style="padding-left: 14px;">
+          <input type="email" id="adminLoginEmail" class="search-input" placeholder="admin@sheberapp.kz" required style="padding-left: 14px;">
         </div>
         <div>
           <label style="font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px;">Пароль</label>
@@ -141,7 +141,7 @@
   <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px;"></div>
 
   <!-- SCRIPTS -->
-  <script src="js/supabase-sync.js?v=30"></script>
-  <script src="js/admin.js?v=30"></script>
+  <script src="js/supabase-sync.js?v=36"></script>
+  <script src="js/admin.js?v=36"></script>
 </body>
 </html>

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>HairStudio — Запись клиентов и Учет</title>
-  <meta name="description" content="Мобильное PWA-приложение для мастеров-парикмахеров: запись клиентов, прайс-лист, учёт материалов и расчёт чистой прибыли">
+  <title>Sheber — Онлайн-запись и Учет для мастеров</title>
+  <meta name="description" content="Мобильное PWA-приложение для бьюти-мастеров: онлайн-запись клиентов, журнал визитов, учет материалов и финансы">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co;">
 
   <!-- PWA & Mobile Web App Meta Tags -->
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#0a0e17">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="HairStudio">
+  <meta name="apple-mobile-web-app-title" content="Sheber">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <!-- Google Fonts: Outfit -->
@@ -21,7 +21,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=36">
 
   <!-- Immediate Modal Controller (Guarantees instant modal response on phones before heavy JS loads) -->
   <script>
@@ -91,11 +91,11 @@
   <header class="app-header">
     <div class="brand-wrapper">
       <div class="brand-icon-wrapper">
-        <img src="icons/icon-512.jpg" alt="HairStudio Logo">
+        <img src="icons/icon-512.jpg" alt="Sheber Logo">
       </div>
       <div>
         <div class="brand-title">
-          <span id="headerStudioName">HairStudio</span>
+          <span id="headerStudioName">Sheber</span>
         </div>
       </div>
     </div>
@@ -593,6 +593,7 @@
           <textarea id="clientDetailsNotes" class="form-textarea" placeholder="Заметки о клиенте, аллергии, формулы краски..."></textarea>
           <button id="btnSaveClientNotes" class="btn-secondary" style="margin-top: 6px;">Сохранить формулу</button>
           <button type="button" id="btnBookThisClient" class="btn-primary" style="margin-top: 10px; width: 100%;">📅 Создать запись для этого клиента</button>
+          <button type="button" id="btnMergeClient" class="btn-secondary" style="margin-top: 8px; width: 100%; font-size: 12px;">🔗 Объединить с дубликатом</button>
           <button type="button" id="btnDeleteClient" class="btn-danger" style="margin-top: 8px; width: 100%; font-size: 12px;">🗑️ Удалить клиента из базы</button>
         </div>
 
@@ -624,7 +625,7 @@
               </div>
               <div style="flex: 1; overflow: hidden;">
                 <div id="authProfileName" style="font-weight: 700; font-size: 16px; color: var(--text-main);">Мастер</div>
-                <div id="authProfileSalon" style="font-size: 13px; color: var(--accent-gold-light);">HairStudio</div>
+                <div id="authProfileSalon" style="font-size: 13px; color: var(--accent-gold-light);">Sheber</div>
                 <div id="authProfileEmail" style="font-size: 11px; color: var(--text-muted); word-break: break-all;">master@example.com</div>
               </div>
             </div>
@@ -735,7 +736,7 @@
             </div>
             <div class="form-group">
               <label class="form-label" for="regSalonName">Название салона / студии</label>
-              <input type="text" id="regSalonName" class="form-input" placeholder="HairStudio" value="HairStudio">
+              <input type="text" id="regSalonName" class="form-input" placeholder="Sheber Studio" value="Sheber">
             </div>
             <div class="form-group">
               <label class="form-label" for="regPhone">Телефон WhatsApp *</label>
@@ -840,7 +841,7 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <h3 class="modal-title">⭐ Подписка HairStudio</h3>
+        <h3 class="modal-title">⭐ Подписка Sheber Pro</h3>
         <button class="modal-close" data-close="modalSubscription" onclick="window.closeModal('modalSubscription')">✕</button>
       </div>
       <div class="modal-body">
@@ -1036,7 +1037,7 @@
 
           <div class="form-group" style="margin-bottom: 8px;">
             <label style="font-size: 11px; color: var(--text-muted);">Instagram аккаунт (@ник) (необязательно):</label>
-            <input type="text" id="settingMasterInstagram" class="form-input" placeholder="hairstudio_kz" style="font-size: 13px; padding: 8px 10px;">
+            <input type="text" id="settingMasterInstagram" class="form-input" placeholder="sheber_kz" style="font-size: 13px; padding: 8px 10px;">
             <span style="font-size: 11px; color: var(--text-subtle); display: block; margin-top: 3px;">
               Отображается кнопкой 📷 Instagram на странице онлайн-записи, чтобы клиенты могли посмотреть ваше портфолио работ. Если пусто — кнопка скрыта.
             </span>
@@ -1087,6 +1088,9 @@
                 ↺ Восстановить
               </button>
             </div>
+            <button type="button" id="btnSyncCloudData" class="btn-primary" style="width: 100%; padding: 10px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              ☁️ Синхронизировать с облаком Supabase
+            </button>
             <button type="button" id="btnExportBackup" class="btn-secondary" style="width: 100%; padding: 10px; font-size: 13px;">
               💾 Скачать файл копии на телефон (JSON)
             </button>
@@ -1110,8 +1114,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/supabase-sync.js?v=33"></script>
-  <script src="js/db.js?v=33"></script>
-  <script type="module" src="js/app.js?v=33"></script>
+  <script src="js/supabase-sync.js?v=36"></script>
+  <script src="js/db.js?v=36"></script>
+  <script type="module" src="js/app.js?v=36"></script>
 </body>
 </html>

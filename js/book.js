@@ -166,7 +166,7 @@
   function renderMasterProfile(master) {
     document.getElementById('masterName').innerText = master.name || 'Мастер';
     const salonElem = document.getElementById('masterSalon');
-    if (salonElem) salonElem.innerText = master.salon_name || 'HairStudio';
+    if (salonElem) salonElem.innerText = master.salon_name || 'Sheber';
 
     const city = (master.city || '').trim();
     let addr = (master.address || '').trim();
@@ -181,7 +181,7 @@
       addressText = city || addr || 'Город уточняйте у мастера';
     }
     document.getElementById('masterAddress').innerText = addressText;
-    document.title = `Запись к ${master.name || 'мастеру'} — ${master.salon_name || 'HairStudio'}`;
+    document.title = `Запись к ${master.name || 'мастеру'} — ${master.salon_name || 'Sheber'}`;
 
     // 2GIS link (custom direct URL or automatic search query)
     let customGis = (master.gis_url && master.gis_url.startsWith('http')) ? master.gis_url : '';
@@ -522,6 +522,20 @@
     submitBtn.innerText = 'Отправка заявки...';
 
     try {
+      // Anti-bot honeypot verification
+      const trap = document.getElementById('clientWebsiteTrap');
+      if (trap && trap.value.trim() !== '') {
+        console.warn('Bot attempt thwarted by honeypot');
+        showSuccessModal({
+          date: bookingState.selectedDate,
+          start_time: bookingState.selectedSlot ? bookingState.selectedSlot.start : '10:00',
+          end_time: bookingState.selectedSlot ? bookingState.selectedSlot.end : '11:00',
+          service_names: 'Услуги',
+          client_name: 'Клиент'
+        });
+        return;
+      }
+
       const nameInput = document.getElementById('clientNameInput');
       const phoneInput = document.getElementById('clientPhoneInput');
       const noteInput = document.getElementById('clientNoteInput');
@@ -547,7 +561,8 @@
       if (res.success) {
         showSuccessModal(bookingPayload);
       } else {
-        alert('Не удалось отправить заявку. Попробуйте еще раз или напишите мастеру в WhatsApp напрямую.');
+        const errorMsg = res.error || 'Не удалось отправить заявку. Попробуйте еще раз или напишите мастеру в WhatsApp напрямую.';
+        alert(errorMsg);
         submitBtn.disabled = false;
         submitBtn.innerText = 'Записаться →';
       }

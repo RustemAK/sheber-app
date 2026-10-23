@@ -1,16 +1,23 @@
 /**
  * HairStudio PWA - Clients CRM & Notes Controller
  * File: js/clients.js
- * Manages client database, appointment history, formula notes and quick contacts.
+ * Manages client database, appointment history, formula notes, deduplication and quick contacts.
  */
 
 import { state } from './state.js';
 import { escapeHtml, cleanPhoneForWhatsapp, cleanPhoneForTel, formatDisplayDate, isAppointmentCompleted, showToast } from './utils.js';
 
-export function renderClients(searchQuery = '') {
+let clientsCurrentPage = 1;
+const CLIENTS_PER_PAGE = 30;
+
+export function renderClients(searchQuery = '', resetPagination = true) {
   const container = document.getElementById('clientsList');
   if (!container) return;
-  container.innerHTML = '';
+
+  if (resetPagination) {
+    clientsCurrentPage = 1;
+    container.innerHTML = '';
+  }
 
   let list = state.clients;
   if (searchQuery) {
@@ -74,9 +81,13 @@ export function renderClients(searchQuery = '') {
     });
   }
 
+  // Pagination slice (prevents DOM explosion on mobile)
+  const totalCount = list.length;
+  const visibleList = list.slice(0, clientsCurrentPage * CLIENTS_PER_PAGE);
+
   const fragment = document.createDocumentFragment();
 
-  list.forEach(c => {
+  visibleList.forEach(c => {
     // Instant O(1) lookup
     const phoneApps = c.phone ? appsByPhone.get(c.phone) : null;
     const nameApps = c.name ? appsByName.get(c.name.trim().toLowerCase()) : null;
@@ -123,9 +134,22 @@ export function renderClients(searchQuery = '') {
     fragment.appendChild(card);
   });
 
+  container.innerHTML = '';
   container.appendChild(fragment);
-}
 
+  // Load more button for pagination
+  if (visibleList.length < totalCount) {
+    const loadMoreBtn = document.createElement('button');
+    loadMoreBtn.className = 'btn-secondary';
+    loadMoreBtn.style.cssText = 'width: 100%; margin: 12px 0 24px; padding: 12px; font-size: 13px; font-weight: 600;';
+    loadMoreBtn.innerText = `Показать ещё (${totalCount - visibleList.length})`;
+    loadMoreBtn.onclick = () => {
+      clientsCurrentPage++;
+      renderClients(searchQuery, false);
+    };
+    container.appendChild(loadMoreBtn);
+  }
+}
 
 export function openClientDetailsModal(client, clientApps, onOpenAppointment) {
   state.viewingClientId = client.id;
@@ -150,6 +174,12 @@ export function openClientDetailsModal(client, clientApps, onOpenAppointment) {
       ${phoneClean ? `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" class="btn-action-small whatsapp">💬</a>` : ''}
       ${phoneClean ? `<a href="tel:${cleanPhoneForTel(client.phone)}" class="btn-action-small call">📞</a>` : ''}
     `;
+  }
+
+  // Merge button setup
+  const btnMerge = document.getElementById('btnMergeClient');
+  if (btnMerge) {
+    btnMerge.onclick = () => handleMergePrompt(client);
   }
 
   // History list
@@ -194,6 +224,12 @@ export async function handleSaveClientNotes(onDataChanged) {
   const notesInput = document.getElementById('clientDetailsNotes');
   client.notes = notesInput ? notesInput.value.trim() : '';
   await window.db.updateClient(client);
+
+  if (window.HairSupabase && window.HairSupabase.syncMasterClients) {
+    const masterId = state.currentMaster ? state.currentMaster.id : null;
+    if (masterId) window.HairSupabase.syncMasterClients(masterId, state.clients).catch(console.warn);
+  }
+
   showToast('Формулы и заметки сохранены');
   if (typeof onDataChanged === 'function') await onDataChanged();
 }
@@ -206,7 +242,96 @@ export async function handleDeleteClient(onDataChanged) {
   if (confirm(`Удалить клиента "${client.name}" из базы?\n\nЗаписи клиента в расписании сохранятся.`)) {
     await window.db.deleteClient(state.viewingClientId);
     if (window.closeModal) window.closeModal('modalClientDetails');
+
+    if (window.HairSupabase && window.HairSupabase.syncMasterClients) {
+      const masterId = state.currentMaster ? state.currentMaster.id : null;
+      if (masterId) window.HairSupabase.syncMasterClients(masterId, state.clients).catch(console.warn);
+    }
+
     showToast('Клиент удалён из базы');
     if (typeof onDataChanged === 'function') await onDataChanged();
+  }
+}
+
+/**
+ * Client Deduplication: Merge duplicate client records into primary
+ */
+export async function mergeClients(primaryClientId, duplicateClientId) {
+  const primary = state.clients.find(c => String(c.id) === String(primaryClientId));
+  const duplicate = state.clients.find(c => String(c.id) === String(duplicateClientId));
+  if (!primary || !duplicate || String(primary.id) === String(duplicate.id)) return false;
+
+  // 1. Reassign appointments of duplicate to primary
+  const dupNameLower = (duplicate.name || '').trim().toLowerCase();
+  for (const app of state.appointments) {
+    let changed = false;
+    if (duplicate.phone && app.clientPhone === duplicate.phone) {
+      app.clientPhone = primary.phone || app.clientPhone;
+      app.clientName = primary.name;
+      changed = true;
+    } else if (app.clientName && app.clientName.trim().toLowerCase() === dupNameLower) {
+      app.clientName = primary.name;
+      if (primary.phone && !app.clientPhone) app.clientPhone = primary.phone;
+      changed = true;
+    }
+    if (changed) {
+      await window.db.updateAppointment(app);
+    }
+  }
+
+  // 2. Append notes
+  if (duplicate.notes && duplicate.notes.trim()) {
+    primary.notes = (primary.notes ? primary.notes + '\n' : '') + `[Объединено с «${duplicate.name}»]: ${duplicate.notes}`;
+    await window.db.updateClient(primary);
+  }
+
+  // 3. Delete duplicate
+  await window.db.deleteClient(duplicate.id);
+
+  if (window.HairSupabase && window.HairSupabase.syncMasterClients) {
+    const masterId = state.currentMaster ? state.currentMaster.id : null;
+    if (masterId) {
+      window.HairSupabase.syncMasterClients(masterId, state.clients).catch(console.warn);
+      window.HairSupabase.syncMasterAppointments(masterId, state.appointments).catch(console.warn);
+    }
+  }
+
+  showToast(`Клиент «${duplicate.name}» объединен с «${primary.name}»!`);
+  if (window.closeModal) window.closeModal('modalClientDetails');
+  if (window.app && window.app.reloadData) await window.app.reloadData();
+  return true;
+}
+
+function handleMergePrompt(currentClient) {
+  const query = prompt(`Введите имя или телефон дубликата для объединения с «${currentClient.name}»:`);
+  if (!query || !query.trim()) return;
+
+  const q = query.trim().toLowerCase();
+  const matches = state.clients.filter(c => 
+    String(c.id) !== String(currentClient.id) &&
+    ((c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q))
+  );
+
+  if (matches.length === 0) {
+    alert('Похожих клиентов не найдено.');
+    return;
+  }
+
+  let promptText = `Найдено совпадений: ${matches.length}.\nВведите номер строки нужного дубликата для объединения в «${currentClient.name}»:\n\n`;
+  matches.forEach((m, idx) => {
+    promptText += `${idx + 1}. ${m.name} (${m.phone || 'без телефона'})\n`;
+  });
+
+  const chosenIndexStr = prompt(promptText, '1');
+  if (!chosenIndexStr) return;
+
+  const chosenIndex = parseInt(chosenIndexStr, 10) - 1;
+  if (chosenIndex >= 0 && chosenIndex < matches.length) {
+    const duplicate = matches[chosenIndex];
+    if (confirm(`Объединить «${duplicate.name}» с «${currentClient.name}»?\n\nВсе визиты и формулы будут перенесены на ${currentClient.name}, а дубликат удален.`)) {
+      mergeClients(currentClient.id, duplicate.id);
+    }
+  } else {
+    alert('Неверный выбор.');
   }
 }

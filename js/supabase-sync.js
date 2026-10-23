@@ -1056,19 +1056,56 @@
 
     try {
       const targetId = masterId || mockStore.master.id;
-      const deleteEndpoint = `${config.url}/rest/v1/master_busy_slots?master_id=eq.${encodeURIComponent(targetId)}&date=gte.${today}`;
-      await fetch(deleteEndpoint, { method: 'DELETE', headers: getHeaders(true) });
 
-      if (slots.length > 0) {
+      // 1. Fetch current existing future slots for this master
+      const fetchEndpoint = `${config.url}/rest/v1/master_busy_slots?master_id=eq.${encodeURIComponent(targetId)}&date=gte.${today}&select=id,date,start_time,end_time`;
+      const getRes = await fetch(fetchEndpoint, { headers: getHeaders(true) });
+      
+      let existing = [];
+      if (getRes.ok) {
+        existing = await getRes.json();
+      }
+
+      // Helper for unique slot comparison key
+      const slotKey = (s) => `${s.date}_${(s.start_time || '').slice(0, 5)}_${(s.end_time || '').slice(0, 5)}`;
+
+      const newKeyMap = new Map();
+      slots.forEach(s => newKeyMap.set(slotKey(s), s));
+
+      const existingKeyMap = new Map();
+      existing.forEach(s => existingKeyMap.set(slotKey(s), s));
+
+      // Items to delete (in cloud but no longer in local active appointments)
+      const toDeleteIds = existing
+        .filter(e => !newKeyMap.has(slotKey(e)))
+        .map(e => e.id);
+
+      // Items to insert (in local but not yet in cloud)
+      const toInsert = slots.filter(s => !existingKeyMap.has(slotKey(s)));
+
+      // If nothing changed, we skip network writes completely!
+      if (toDeleteIds.length === 0 && toInsert.length === 0) {
+        return { success: true, count: slots.length, skipped: true };
+      }
+
+      // Execute batch deletes if needed
+      if (toDeleteIds.length > 0) {
+        const deleteEndpoint = `${config.url}/rest/v1/master_busy_slots?id=in.(${toDeleteIds.map(encodeURIComponent).join(',')})`;
+        await fetch(deleteEndpoint, { method: 'DELETE', headers: getHeaders(true) });
+      }
+
+      // Execute batch inserts if needed
+      if (toInsert.length > 0) {
         const insertEndpoint = `${config.url}/rest/v1/master_busy_slots`;
         const res = await fetch(insertEndpoint, {
           method: 'POST',
           headers: getHeaders(true),
-          body: JSON.stringify(slots)
+          body: JSON.stringify(toInsert)
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }
-      return { success: true, count: slots.length };
+
+      return { success: true, count: slots.length, diff: { deleted: toDeleteIds.length, inserted: toInsert.length } };
     } catch (err) {
       console.error('syncMasterBusySlots error:', err);
       return { success: false, error: err.message };
@@ -1076,8 +1113,8 @@
   }
 
   /**
-   * Sync Master Services to Cloud (Supabase)
-   * Called when master adds/edits/deletes a service locally
+   * Sync Master Services to Cloud (Supabase) - Differential Update
+   * Only performs DELETE / INSERT / PATCH for records that actually changed.
    */
   async function syncMasterServices(masterId, localServices) {
     if (!Array.isArray(localServices)) return { success: false };
@@ -1095,24 +1132,205 @@
     }));
 
     try {
-      // Delete existing services for this master
-      const deleteEndpoint = `${config.url}/rest/v1/master_services?master_id=eq.${encodeURIComponent(targetId)}`;
-      await fetch(deleteEndpoint, { method: 'DELETE', headers: getHeaders(true) });
+      // 1. Fetch current cloud services
+      const fetchEndpoint = `${config.url}/rest/v1/master_services?master_id=eq.${encodeURIComponent(targetId)}&select=id,name,category,duration_min,sort_order`;
+      const getRes = await fetch(fetchEndpoint, { headers: getHeaders(true) });
 
-      // Insert current services
-      if (cloudServices.length > 0) {
-        const insertEndpoint = `${config.url}/rest/v1/master_services`;
-        const res = await fetch(insertEndpoint, {
+      let existing = [];
+      if (getRes.ok) {
+        existing = await getRes.json();
+      }
+
+      const srvKey = (s) => `${(s.name || '').trim().toLowerCase()}`;
+
+      const existingMap = new Map();
+      existing.forEach(e => existingMap.set(srvKey(e), e));
+
+      const localMap = new Map();
+      cloudServices.forEach(s => localMap.set(srvKey(s), s));
+
+      // Delete removed services
+      const toDeleteIds = existing
+        .filter(e => !localMap.has(srvKey(e)))
+        .map(e => e.id);
+
+      // Insert new services
+      const toInsert = cloudServices.filter(s => !existingMap.has(srvKey(s)));
+
+      // Update changed services
+      const toUpdate = [];
+      cloudServices.forEach(s => {
+        const ex = existingMap.get(srvKey(s));
+        if (ex && (ex.duration_min !== s.duration_min || ex.category !== s.category || ex.sort_order !== s.sort_order)) {
+          toUpdate.push({ id: ex.id, ...s });
+        }
+      });
+
+      if (toDeleteIds.length === 0 && toInsert.length === 0 && toUpdate.length === 0) {
+        return { success: true, count: cloudServices.length, skipped: true };
+      }
+
+      if (toDeleteIds.length > 0) {
+        const delEndpoint = `${config.url}/rest/v1/master_services?id=in.(${toDeleteIds.map(encodeURIComponent).join(',')})`;
+        await fetch(delEndpoint, { method: 'DELETE', headers: getHeaders(true) });
+      }
+
+      if (toInsert.length > 0) {
+        const insEndpoint = `${config.url}/rest/v1/master_services`;
+        const res = await fetch(insEndpoint, {
           method: 'POST',
           headers: getHeaders(true),
-          body: JSON.stringify(cloudServices)
+          body: JSON.stringify(toInsert)
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }
+
+      for (const u of toUpdate) {
+        const patchEndpoint = `${config.url}/rest/v1/master_services?id=eq.${encodeURIComponent(u.id)}`;
+        await fetch(patchEndpoint, {
+          method: 'PATCH',
+          headers: getHeaders(true),
+          body: JSON.stringify({
+            category: u.category,
+            duration_min: u.duration_min,
+            sort_order: u.sort_order
+          })
+        });
+      }
+
       return { success: true, count: cloudServices.length };
     } catch (err) {
       console.error('syncMasterServices error:', err);
       return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * ==========================================
+   * REALTIME WEBSOCKET (Supabase Phoenix Channels)
+   * ==========================================
+   */
+  let realtimeSocket = null;
+  let realtimeHeartbeatInterval = null;
+  let realtimeActiveMasterId = null;
+  const realtimeCallbacks = new Set();
+
+  function subscribeBookingRequests(masterId, callback) {
+    if (!isConfigured() || !masterId) {
+      return { unsubscribe: () => {} };
+    }
+
+    if (typeof callback === 'function') {
+      realtimeCallbacks.add(callback);
+    }
+
+    if (realtimeSocket && (realtimeSocket.readyState === WebSocket.OPEN || realtimeSocket.readyState === WebSocket.CONNECTING)) {
+      if (realtimeActiveMasterId === masterId) {
+        return {
+          unsubscribe: () => {
+            realtimeCallbacks.delete(callback);
+          }
+        };
+      }
+    }
+
+    realtimeActiveMasterId = masterId;
+    connectRealtimeSocket(masterId);
+
+    return {
+      unsubscribe: () => {
+        realtimeCallbacks.delete(callback);
+        if (realtimeCallbacks.size === 0 && realtimeSocket) {
+          try {
+            clearInterval(realtimeHeartbeatInterval);
+            realtimeSocket.close();
+          } catch (e) {}
+          realtimeSocket = null;
+        }
+      }
+    };
+  }
+
+  function connectRealtimeSocket(masterId) {
+    if (!config.url || !config.key || typeof WebSocket === 'undefined') return;
+    try {
+      if (realtimeSocket) {
+        try { realtimeSocket.close(); } catch (e) {}
+      }
+      clearInterval(realtimeHeartbeatInterval);
+
+      const wsProto = config.url.startsWith('https') ? 'wss:' : 'ws:';
+      const host = config.url.replace(/^https?:\/\//, '');
+      const wsUrl = `${wsProto}//${host}/realtime/v1/websocket?apikey=${encodeURIComponent(config.key)}&vsn=1.0.0`;
+
+      realtimeSocket = new WebSocket(wsUrl);
+      let refCount = 1;
+
+      realtimeSocket.onopen = () => {
+        // 1. Heartbeat every 25 seconds
+        realtimeHeartbeatInterval = setInterval(() => {
+          if (realtimeSocket && realtimeSocket.readyState === WebSocket.OPEN) {
+            realtimeSocket.send(JSON.stringify({
+              topic: 'phoenix',
+              event: 'heartbeat',
+              payload: {},
+              ref: String(refCount++)
+            }));
+          }
+        }, 25000);
+
+        // 2. Join the channel for public:booking_requests
+        realtimeSocket.send(JSON.stringify({
+          topic: 'realtime:public:booking_requests',
+          event: 'phx_join',
+          payload: {
+            config: {
+              broadcast: { self: false },
+              postgres_changes: [{
+                event: 'INSERT',
+                schema: 'public',
+                table: 'booking_requests',
+                filter: `master_id=eq.${masterId}`
+              }]
+            }
+          },
+          ref: String(refCount++)
+        }));
+      };
+
+      realtimeSocket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.event === 'postgres_changes' && msg.payload) {
+            const data = msg.payload.data;
+            if (data && (data.type === 'INSERT' || msg.payload.type === 'INSERT')) {
+              const record = data.record || msg.payload.record;
+              realtimeCallbacks.forEach(cb => {
+                try { cb(record); } catch (e) { console.warn(e); }
+              });
+            }
+          }
+        } catch (e) {
+          // ignore non-json messages
+        }
+      };
+
+      realtimeSocket.onerror = (e) => {
+        console.warn('Realtime WS status:', e);
+      };
+
+      realtimeSocket.onclose = () => {
+        clearInterval(realtimeHeartbeatInterval);
+        if (realtimeCallbacks.size > 0 && navigator.onLine) {
+          setTimeout(() => {
+            if (realtimeCallbacks.size > 0 && realtimeActiveMasterId) {
+              connectRealtimeSocket(realtimeActiveMasterId);
+            }
+          }, 6000);
+        }
+      };
+    } catch (err) {
+      console.warn('Could not establish Supabase Realtime connection:', err);
     }
   }
 
@@ -1316,6 +1534,162 @@
     }
   }
 
+  /**
+   * ==========================================
+   * FULL CLOUD CRM SYNC (Clients, Appointments, Expenses)
+   * Protects master's entire business database against phone loss or cache eviction.
+   * ==========================================
+   */
+
+  async function syncMasterClients(masterId, localClients) {
+    if (!Array.isArray(localClients) || !masterId || !isConfigured()) return { success: false };
+    try {
+      const records = localClients.map(c => ({
+        master_id: masterId,
+        local_id: Number(c.id) || 0,
+        name: c.name || 'Без имени',
+        phone: (c.phone && c.phone.trim()) ? c.phone.trim() : null,
+        notes: c.notes || '',
+        updated_at: new Date().toISOString()
+      }));
+
+      const deleteEndpoint = `${config.url}/rest/v1/master_clients?master_id=eq.${encodeURIComponent(masterId)}`;
+      await fetch(deleteEndpoint, { method: 'DELETE', headers: getHeaders(true) });
+
+      if (records.length > 0) {
+        const insertEndpoint = `${config.url}/rest/v1/master_clients`;
+        await fetch(insertEndpoint, {
+          method: 'POST',
+          headers: getHeaders(true),
+          body: JSON.stringify(records)
+        });
+      }
+      return { success: true, count: records.length };
+    } catch (err) {
+      console.warn('syncMasterClients error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function syncMasterAppointments(masterId, localAppointments) {
+    if (!Array.isArray(localAppointments) || !masterId || !isConfigured()) return { success: false };
+    try {
+      const toSync = localAppointments.slice(-1000).map(a => ({
+        master_id: masterId,
+        local_id: Number(a.id) || 0,
+        client_name: a.clientName || 'Клиент',
+        client_phone: a.clientPhone || '',
+        date: a.date,
+        start_time: a.startTime,
+        end_time: a.endTime,
+        services: a.services || [],
+        total_price: Number(a.totalPrice) || 0,
+        status: a.status || 'scheduled',
+        materials_used: a.materialsUsed || '',
+        notes: a.notes || '',
+        updated_at: a.updated_at || new Date().toISOString()
+      }));
+
+      const deleteEndpoint = `${config.url}/rest/v1/master_appointments?master_id=eq.${encodeURIComponent(masterId)}`;
+      await fetch(deleteEndpoint, { method: 'DELETE', headers: getHeaders(true) });
+
+      if (toSync.length > 0) {
+        const insertEndpoint = `${config.url}/rest/v1/master_appointments`;
+        await fetch(insertEndpoint, {
+          method: 'POST',
+          headers: getHeaders(true),
+          body: JSON.stringify(toSync)
+        });
+      }
+      return { success: true, count: toSync.length };
+    } catch (err) {
+      console.warn('syncMasterAppointments error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function syncMasterExpenses(masterId, localExpenses) {
+    if (!Array.isArray(localExpenses) || !masterId || !isConfigured()) return { success: false };
+    try {
+      const toSync = localExpenses.map(e => ({
+        master_id: masterId,
+        local_id: Number(e.id) || 0,
+        date: e.date,
+        title: e.title,
+        category: e.category || 'Расходники',
+        amount: Number(e.amount) || 0,
+        quantity: e.quantity || '',
+        notes: e.notes || '',
+        updated_at: new Date().toISOString()
+      }));
+
+      const deleteEndpoint = `${config.url}/rest/v1/master_expenses?master_id=eq.${encodeURIComponent(masterId)}`;
+      await fetch(deleteEndpoint, { method: 'DELETE', headers: getHeaders(true) });
+
+      if (toSync.length > 0) {
+        const insertEndpoint = `${config.url}/rest/v1/master_expenses`;
+        await fetch(insertEndpoint, {
+          method: 'POST',
+          headers: getHeaders(true),
+          body: JSON.stringify(toSync)
+        });
+      }
+      return { success: true, count: toSync.length };
+    } catch (err) {
+      console.warn('syncMasterExpenses error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function downloadMasterCloudData(masterId) {
+    if (!masterId || !isConfigured()) return null;
+    try {
+      const [clientsRes, appsRes, expRes] = await Promise.all([
+        fetch(`${config.url}/rest/v1/master_clients?master_id=eq.${encodeURIComponent(masterId)}&select=*`, { headers: getHeaders(true) }),
+        fetch(`${config.url}/rest/v1/master_appointments?master_id=eq.${encodeURIComponent(masterId)}&select=*&order=date.asc`, { headers: getHeaders(true) }),
+        fetch(`${config.url}/rest/v1/master_expenses?master_id=eq.${encodeURIComponent(masterId)}&select=*&order=date.asc`, { headers: getHeaders(true) })
+      ]);
+
+      const clients = clientsRes.ok ? await clientsRes.json() : [];
+      const appointments = appsRes.ok ? await appsRes.json() : [];
+      const expenses = expRes.ok ? await expRes.json() : [];
+
+      return {
+        clients: (clients || []).map(c => ({
+          name: c.name,
+          phone: c.phone,
+          notes: c.notes,
+          createdAt: c.created_at
+        })),
+        appointments: (appointments || []).map(a => ({
+          clientName: a.client_name,
+          clientPhone: a.client_phone,
+          date: a.date,
+          startTime: (a.start_time || '').slice(0, 5),
+          endTime: (a.end_time || '').slice(0, 5),
+          services: a.services || [],
+          totalPrice: a.total_price,
+          status: a.status,
+          materialsUsed: a.materials_used,
+          notes: a.notes,
+          createdAt: a.created_at,
+          updated_at: a.updated_at
+        })),
+        expenses: (expenses || []).map(e => ({
+          date: e.date,
+          title: e.title,
+          category: e.category,
+          amount: e.amount,
+          quantity: e.quantity,
+          notes: e.notes
+        }))
+      };
+    } catch (err) {
+      console.warn('downloadMasterCloudData error:', err);
+      return null;
+    }
+  }
+
   // Public API export
   return {
     config,
@@ -1339,6 +1713,11 @@
     updateBookingStatus,
     syncMasterBusySlots,
     syncMasterServices,
+    syncMasterClients,
+    syncMasterAppointments,
+    syncMasterExpenses,
+    downloadMasterCloudData,
+    subscribeBookingRequests,
     getAllMastersForAdmin,
     adminExtendSubscription,
     adminToggleMasterStatus,

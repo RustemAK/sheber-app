@@ -6,7 +6,7 @@
 class HairStudioDB {
   constructor() {
     this.dbName = 'HairStudioDB';
-    this.dbVersion = 2;
+    this.dbVersion = 3;
     this.db = null;
   }
 
@@ -59,6 +59,12 @@ class HairStudioDB {
           const notesStore = db.createObjectStore('client_notes', { keyPath: 'id', autoIncrement: true });
           notesStore.createIndex('client_phone', 'client_phone', { unique: false });
           notesStore.createIndex('updated_at', 'updated_at', { unique: false });
+        }
+
+        // Backups store (Offline automated snapshots without 5MB localStorage limits)
+        if (!db.objectStoreNames.contains('backups')) {
+          const backupStore = db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
+          backupStore.createIndex('timestamp', 'timestamp', { unique: false });
         }
       };
 
@@ -123,6 +129,19 @@ class HairStudioDB {
     return this._tx('expenses', 'readonly', (store) => store.getAll());
   }
 
+  async getExpensesByDateRange(startDate, endDate) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['expenses'], 'readonly');
+      const store = tx.objectStore('expenses');
+      const index = store.index('date');
+      const range = IDBKeyRange.bound(startDate, endDate);
+      const request = index.getAll(range);
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async addExpense(expense) {
     return this._tx('expenses', 'readwrite', (store) => store.add(expense));
   }
@@ -148,6 +167,19 @@ class HairStudioDB {
       const index = store.index('date');
       const request = index.getAll(dateStr);
       request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAppointmentsByDateRange(startDate, endDate) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['appointments'], 'readonly');
+      const store = tx.objectStore('appointments');
+      const index = store.index('date');
+      const range = IDBKeyRange.bound(startDate, endDate);
+      const request = index.getAll(range);
+      request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     });
   }
@@ -269,7 +301,7 @@ class HairStudioDB {
     const clients = await this.getClients();
 
     const data = {
-      app: 'HairStudio',
+      app: 'Sheber',
       version: 1,
       exportedAt: new Date().toISOString(),
       appointments,
@@ -329,6 +361,83 @@ class HairStudioDB {
     const stores = ['appointments', 'services', 'expenses', 'clients'];
     for (const storeName of stores) {
       await this._tx(storeName, 'readwrite', (store) => store.clear());
+    }
+  }
+
+  // ================= BACKUPS STORE (IndexedDB-based) =================
+  async saveBackup(jsonData) {
+    await this.init();
+    const dataToSave = typeof jsonData === 'string' ? jsonData : JSON.stringify(jsonData);
+    const backupRecord = {
+      timestamp: new Date().toISOString(),
+      data: dataToSave
+    };
+
+    const newId = await this._tx('backups', 'readwrite', (store) => store.add(backupRecord));
+    await this.deleteOldBackups(5);
+    return newId;
+  }
+
+  async getLatestBackup() {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['backups'], 'readonly');
+      const store = tx.objectStore('backups');
+      const index = store.index('timestamp');
+      // Open cursor moving backwards to get newest backup first
+      const request = index.openCursor(null, 'prev');
+      request.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          resolve(cursor.value);
+        } else {
+          resolve(null);
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllBackups() {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['backups'], 'readonly');
+      const store = tx.objectStore('backups');
+      const backups = [];
+      const request = store.openCursor();
+      request.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          // Exclude large data payload to return lightweight list of metadata
+          backups.push({
+            id: cursor.value.id,
+            timestamp: cursor.value.timestamp,
+            size: cursor.value.data ? cursor.value.data.length : 0
+          });
+          cursor.continue();
+        } else {
+          resolve(backups.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteBackup(id) {
+    return this._tx('backups', 'readwrite', (store) => store.delete(Number(id)));
+  }
+
+  async deleteOldBackups(keepCount = 5) {
+    try {
+      const backups = await this.getAllBackups();
+      if (backups.length > keepCount) {
+        const toDelete = backups.slice(keepCount);
+        for (const item of toDelete) {
+          await this.deleteBackup(item.id);
+        }
+      }
+    } catch (e) {
+      console.warn('Error pruning old backups:', e);
     }
   }
 

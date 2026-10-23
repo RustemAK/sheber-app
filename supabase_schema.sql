@@ -509,7 +509,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.get_occupied_slots(UUID, DATE) TO anon, authenticated, service_role;
 
--- Безопасное бронирование
+-- Безопасное бронирование с валидацией и Rate-Limiting
 CREATE OR REPLACE FUNCTION public.create_public_booking(
     p_master_id UUID,
     p_client_name TEXT,
@@ -526,7 +526,41 @@ DECLARE
     v_master public.masters%ROWTYPE;
     v_booking_id UUID;
     v_is_sub_valid BOOLEAN := FALSE;
+    v_recent_attempts INT;
+    v_clean_phone TEXT;
 BEGIN
+    -- Валидация имени и телефона
+    IF length(trim(COALESCE(p_client_name, ''))) < 2 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Укажите ваше имя (минимум 2 символа)');
+    END IF;
+
+    v_clean_phone := regexp_replace(COALESCE(p_client_phone, ''), '\D', '', 'g');
+    IF length(v_clean_phone) < 10 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Укажите корректный номер телефона');
+    END IF;
+
+    -- Валидация даты
+    IF p_date < CURRENT_DATE THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Нельзя записаться на прошедшую дату');
+    END IF;
+
+    IF p_date > CURRENT_DATE + interval '90 days' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Онлайн-запись открыта не более чем на 90 дней вперед');
+    END IF;
+
+    -- Anti-Spam Rate-Limiting: не более 4 заявок с одного номера за последний час
+    SELECT count(*) INTO v_recent_attempts
+    FROM public.booking_requests
+    WHERE client_phone = trim(p_client_phone)
+      AND created_at > (now() - interval '1 hour');
+
+    IF v_recent_attempts >= 4 THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Слишком много заявок с данного номера. Пожалуйста, подождите немного перед повторной попыткой.'
+        );
+    END IF;
+
     SELECT * INTO v_master FROM public.masters WHERE id = p_master_id;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'error', 'Мастер не найден');
@@ -573,6 +607,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.create_public_booking(UUID, TEXT, TEXT, DATE, TIME, TIME, TEXT, INT, TEXT) TO anon, authenticated, service_role;
+
+-- Индексы производительности для быстрого масштабирования
+CREATE INDEX IF NOT EXISTS idx_master_busy_slots_master_date ON public.master_busy_slots (master_id, date);
+CREATE INDEX IF NOT EXISTS idx_booking_requests_master_status_date ON public.booking_requests (master_id, status, date);
+CREATE INDEX IF NOT EXISTS idx_booking_requests_phone_created ON public.booking_requests (client_phone, created_at);
+CREATE INDEX IF NOT EXISTS idx_master_services_master_sort ON public.master_services (master_id, sort_order);
 
 -- Получение всех мастеров для суперадминистратора
 CREATE OR REPLACE FUNCTION public.admin_get_all_masters()
