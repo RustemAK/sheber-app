@@ -21,7 +21,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=38">
+  <link rel="stylesheet" href="css/style.css?v=39">
 
   <!-- Immediate Modal Controller (Guarantees instant modal response on phones before heavy JS loads) -->
   <script>
@@ -219,18 +219,13 @@
 
     <!-- TAB 3: SERVICES (УСЛУГИ И ПРАЙС) -->
     <section id="tab-services" class="tab-screen">
-      <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-        <div class="chips-filter" id="serviceCategoryFilter" style="flex: 1; padding-bottom: 6px; margin-bottom: 0;">
-          <button class="chip-btn active" data-category="all">Все</button>
-          <button class="chip-btn" data-category="Стрижки">Стрижки</button>
-          <button class="chip-btn" data-category="Окрашивание">Окрашивание</button>
-          <button class="chip-btn" data-category="Уход">Уход</button>
-          <button class="chip-btn" data-category="Укладка">Укладка</button>
-          <button class="chip-btn" data-category="Другое">Другое</button>
-        </div>
-        <button type="button" id="btnAddService" class="btn-primary" style="flex-shrink: 0; width: auto; padding: 8px 14px; font-size: 13px; font-weight: 700; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px;" title="Добавить новую услугу">
-          <span>➕</span> <span>Услуга</span>
-        </button>
+      <div class="chips-filter" id="serviceCategoryFilter">
+        <button class="chip-btn active" data-category="all">Все</button>
+        <button class="chip-btn" data-category="Стрижки">Стрижки</button>
+        <button class="chip-btn" data-category="Окрашивание">Окрашивание</button>
+        <button class="chip-btn" data-category="Уход">Уход</button>
+        <button class="chip-btn" data-category="Укладка">Укладка</button>
+        <button class="chip-btn" data-category="Другое">Другое</button>
       </div>
       <div id="servicesList" class="data-list">
         <!-- Rendered via JS -->
@@ -245,17 +240,12 @@
         <div class="stat-card-sub">Краска, оксиды, расходники и аренда</div>
       </div>
 
-      <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-        <div class="chips-filter" id="expenseCategoryFilter" style="flex: 1; padding-bottom: 6px; margin-bottom: 0;">
-          <button class="chip-btn active" data-category="all">Все</button>
-          <button class="chip-btn" data-category="Красители">Красители</button>
-          <button class="chip-btn" data-category="Расходники">Расходники</button>
-          <button class="chip-btn" data-category="Уход/Косметика">Уход/Косметика</button>
-          <button class="chip-btn" data-category="Аренда/Оборудование">Аренда</button>
-        </div>
-        <button type="button" id="btnAddExpense" class="btn-primary" style="flex-shrink: 0; width: auto; padding: 8px 14px; font-size: 13px; font-weight: 700; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px;" title="Добавить расход">
-          <span>➕</span> <span>Расход</span>
-        </button>
+      <div class="chips-filter" id="expenseCategoryFilter">
+        <button class="chip-btn active" data-category="all">Все</button>
+        <button class="chip-btn" data-category="Красители">Красители</button>
+        <button class="chip-btn" data-category="Расходники">Расходники</button>
+        <button class="chip-btn" data-category="Уход/Косметика">Уход/Косметика</button>
+        <button class="chip-btn" data-category="Аренда/Оборудование">Аренда</button>
       </div>
       <div id="expensesList" class="data-list">
         <!-- Rendered via JS -->
