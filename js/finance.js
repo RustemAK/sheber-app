@@ -144,7 +144,10 @@ export function renderExpenses(resetPagination = true) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📦</div>
-        <div>В этой категории расходов нет</div>
+        <div style="margin-bottom: 12px;">В этой категории расходов нет</div>
+        <button type="button" class="btn-primary" style="width: auto; padding: 10px 22px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;" onclick="window.openExpenseModal()">
+          <span>➕</span> <span>Внести расход</span>
+        </button>
       </div>
     `;
     return;

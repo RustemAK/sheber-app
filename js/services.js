@@ -21,7 +21,10 @@ export function renderServices() {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">✂️</div>
-        <div>В этой категории пока нет услуг</div>
+        <div style="margin-bottom: 12px;">В этой категории пока нет услуг</div>
+        <button type="button" class="btn-primary" style="width: auto; padding: 10px 22px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;" onclick="window.openServiceModal()">
+          <span>➕</span> <span>Добавить услугу</span>
+        </button>
       </div>
     `;
     return;

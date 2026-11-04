@@ -304,8 +304,8 @@ export function renderSchedule() {
         });
       } else {
         slotContent.innerHTML = `
-          <button type="button" class="btn-timeline-add-slot" data-hour="${hourStr}" title="Нажмите, чтобы записать на ${hourStr}">
-            <span class="slot-plus-icon">+</span>
+          <button type="button" class="btn-timeline-add-slot timeline-empty-slot" data-hour="${hourStr}" title="Нажмите, чтобы записать на ${hourStr}">
+            <span class="slot-plus-icon empty-slot-plus">+</span>
             <span class="slot-free-text">Свободно на ${hourStr}</span>
           </button>
         `;
@@ -339,7 +339,10 @@ export function renderSchedule() {
         <div style="font-weight: 600; font-size: 16px; margin-bottom: 4px; color: var(--text-main);">
           На этот день записей нет
         </div>
-        <div>Нажмите кнопку «+», чтобы записать клиента на ${formatDisplayDate(state.selectedDate)}</div>
+        <div style="margin-bottom: 12px;">Нажмите кнопку ниже или «+», чтобы записать клиента на ${formatDisplayDate(state.selectedDate)}</div>
+        <button type="button" class="btn-primary" style="width: auto; padding: 10px 22px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;" onclick="window.openAppointmentModal()">
+          <span>➕</span> <span>Записать клиента</span>
+        </button>
       </div>
     `;
     return;

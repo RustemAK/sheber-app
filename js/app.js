@@ -1882,6 +1882,29 @@ export function switchTab(tabId, shouldScroll = true) {
     s.classList.toggle('active', s.id === `tab-${tabId}`);
   });
 
+  const btnFabEl = document.getElementById('btnFab');
+  if (btnFabEl) {
+    if (tabId === 'schedule') {
+      btnFabEl.style.display = 'flex';
+      btnFabEl.title = 'Новая запись на прием';
+      btnFabEl.setAttribute('aria-label', 'Новая запись');
+    } else if (tabId === 'clients') {
+      btnFabEl.style.display = 'flex';
+      btnFabEl.title = 'Новая запись клиента';
+      btnFabEl.setAttribute('aria-label', 'Новая запись клиента');
+    } else if (tabId === 'services') {
+      btnFabEl.style.display = 'flex';
+      btnFabEl.title = 'Добавить услугу в прайс';
+      btnFabEl.setAttribute('aria-label', 'Добавить услугу');
+    } else if (tabId === 'expenses') {
+      btnFabEl.style.display = 'flex';
+      btnFabEl.title = 'Внести расход / закупку';
+      btnFabEl.setAttribute('aria-label', 'Внести расход');
+    } else if (tabId === 'finance') {
+      btnFabEl.style.display = 'none';
+    }
+  }
+
   if (tabId === 'schedule') renderSchedule();
   else if (tabId === 'clients') renderClients();
   else if (tabId === 'services') renderServices();
@@ -2134,6 +2157,20 @@ function setupEventListeners() {
       state.financePeriod = btn.getAttribute('data-period');
       localStorage.setItem('hairstudio_finance_period', state.financePeriod);
       renderFinance();
+    });
+  }
+
+  // Floating Action Button (FAB)
+  const btnFab = document.getElementById('btnFab');
+  if (btnFab) {
+    btnFab.addEventListener('click', () => {
+      if (state.activeTab === 'services') {
+        openServiceModal();
+      } else if (state.activeTab === 'expenses') {
+        openExpenseModal();
+      } else {
+        openAppointmentModal();
+      }
     });
   }
 
