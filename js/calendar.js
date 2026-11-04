@@ -291,10 +291,10 @@ export function renderSchedule() {
       const hasApps = hourApps.length > 0;
 
       row.innerHTML = `
-        <div class="timeline-time-label">
+        <div class="timeline-time-col timeline-time-label ${hasApps ? 'has-app' : ''}">
           <span>${hourStr}</span>
         </div>
-        <div class="timeline-slot-content ${hasApps ? 'has-appointments' : 'empty-slot'}"></div>
+        <div class="timeline-content-col timeline-slot-content ${hasApps ? 'has-appointments' : 'empty-slot'}"></div>
       `;
 
       const slotContent = row.querySelector('.timeline-slot-content');
