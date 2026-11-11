@@ -143,6 +143,7 @@ export async function handleServiceDelete(onDataChanged) {
 export async function triggerSyncMasterServices() {
   if (!window.HairSupabase || !window.HairSupabase.isConfigured()) return;
   const masterId = state.currentMaster ? state.currentMaster.id : null;
+  if (!masterId) return;
   try {
     await window.HairSupabase.syncMasterServices(masterId, state.services);
   } catch (e) {

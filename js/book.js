@@ -77,8 +77,12 @@
         e.target.value = '';
         return;
       }
-      if (val[0] === '8') val = '7' + val.slice(1);
-      if (val[0] !== '7') val = '7' + val;
+      if (val.length === 10 && (val[0] === '7' || val[0] === '6' || val[0] === '9')) {
+        val = '7' + val;
+      } else {
+        if (val[0] === '8') val = '7' + val.slice(1);
+        if (val[0] !== '7') val = '7' + val;
+      }
 
       let formatted = '+7';
       if (val.length > 1) formatted += ' (' + val.substring(1, 4);
@@ -506,7 +510,7 @@
     const hasSlot = Boolean(bookingState.selectedSlot && bookingState.selectedDate);
     const nameVal = nameInput ? nameInput.value.trim() : '';
     const phoneDigits = phoneInput ? phoneInput.value.replace(/\D/g, '') : '';
-    const hasValidPhone = phoneDigits.length >= 11;
+    const hasValidPhone = phoneDigits.length >= 10;
 
     if (hasServices && hasSlot && nameVal.length >= 2 && hasValidPhone) {
       submitBtn.disabled = false;

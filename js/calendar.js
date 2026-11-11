@@ -15,6 +15,7 @@ import {
   cleanPhoneForWhatsapp, 
   cleanPhoneForTel, 
   isAppointmentPast, 
+  formatCurrency, 
   RU_DAYS, 
   RU_MONTHS, 
   showToast 
@@ -124,6 +125,7 @@ export function createAppointmentCard(app) {
         <div class="compact-time-name">
           <span class="compact-time">${app.startTime || '--:--'}–${app.endTime || '--:--'}</span>
           <span class="compact-client-name" title="${escapeHtml(app.clientName)}">${escapeHtml(app.clientName)}</span>
+          ${app.totalPrice ? `<span class="compact-price-pill" style="font-size: 11px; font-weight: 700; color: var(--accent-gold); margin-left: 4px; white-space: nowrap;">${formatCurrency(app.totalPrice)}</span>` : ''}
           ${app.channel === 'whatsapp' ? '<span class="compact-channel-icon" title="Запись через WhatsApp">💬</span>' : ''}
           ${noteTooltip ? `<span class="compact-note-indicator" title="${noteTooltip}">📝</span>` : ''}
         </div>
@@ -657,6 +659,7 @@ export async function handleAppointmentDelete(onDataChanged) {
 export async function triggerAutoSyncSlots() {
   if (!window.HairSupabase || !window.HairSupabase.isConfigured()) return;
   const masterId = state.currentMaster ? state.currentMaster.id : null;
+  if (!masterId) return;
   try {
     await window.HairSupabase.syncMasterBusySlots(masterId, state.appointments);
   } catch (err) {

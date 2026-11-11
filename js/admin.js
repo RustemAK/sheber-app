@@ -405,6 +405,13 @@
         modalPayments.classList.remove('active');
       });
     }
+    if (modalPayments) {
+      modalPayments.addEventListener('click', (e) => {
+        if (e.target === modalPayments) {
+          modalPayments.classList.remove('active');
+        }
+      });
+    }
   }
 
   function renderPaymentsList(list) {

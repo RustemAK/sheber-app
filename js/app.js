@@ -120,6 +120,9 @@ export function closeModal(modalId, syncHistory = true) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
 
+  const wasActive = modal.classList.contains('active') || modal.style.display === 'flex';
+  if (!wasActive) return;
+
   modal.classList.remove('active');
   modal.style.display = 'none';
   modal.style.opacity = '';
@@ -134,6 +137,8 @@ export function closeModal(modalId, syncHistory = true) {
 
   if (syncHistory && history.state && history.state.modalOpen === modalId) {
     try {
+      const nextState = Object.assign({}, history.state, { modalOpen: null });
+      history.replaceState(nextState, '');
       programmaticBackCount++;
       history.back();
       setTimeout(() => {

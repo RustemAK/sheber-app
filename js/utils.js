@@ -25,6 +25,13 @@ export const safeStorage = {
       console.warn('LocalStorage write failed:', e);
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn('LocalStorage removeItem failed:', e);
+    }
+  },
   getSession(key, fallback = null) {
     try {
       const val = sessionStorage.getItem(key);
@@ -38,6 +45,13 @@ export const safeStorage = {
       sessionStorage.setItem(key, val);
     } catch (e) {
       console.warn('SessionStorage write failed:', e);
+    }
+  },
+  removeSession(key) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (e) {
+      console.warn('SessionStorage removeItem failed:', e);
     }
   }
 };
