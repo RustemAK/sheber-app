@@ -23,24 +23,35 @@ import {
 } from './utils.js';
 
 export function updateDateNavLabel() {
-  const label = document.getElementById('currentDateLabel');
-  if (!label) return;
-  const d = parseYMD(state.selectedDate);
-  const now = new Date();
-  const todayStr = formatDateToYMD(now);
+  const monthYearLabel = document.getElementById('currentMonthYearLabel');
+  const dateLabel = document.getElementById('currentDateLabel');
+  if (!monthYearLabel && !dateLabel) return;
 
-  let prefix = '';
-  if (state.selectedDate === todayStr) {
-    prefix = 'Сегодня, ';
-  } else {
-    const tmr = new Date(now);
-    tmr.setDate(now.getDate() + 1);
-    if (state.selectedDate === formatDateToYMD(tmr)) {
-      prefix = 'Завтра, ';
-    }
+  const d = parseYMD(state.selectedDate);
+  const monthNamesRu = [
+    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+  ];
+
+  if (monthYearLabel) {
+    monthYearLabel.innerText = `${monthNamesRu[d.getMonth()]} ${d.getFullYear()}`;
   }
 
-  label.innerText = `${prefix}${d.getDate()} ${RU_MONTHS[d.getMonth()]}`;
+  if (dateLabel) {
+    const now = new Date();
+    const todayStr = formatDateToYMD(now);
+    let prefix = '';
+    if (state.selectedDate === todayStr) {
+      prefix = 'Сегодня, ';
+    } else {
+      const tmr = new Date(now);
+      tmr.setDate(now.getDate() + 1);
+      if (state.selectedDate === formatDateToYMD(tmr)) {
+        prefix = 'Завтра, ';
+      }
+    }
+    dateLabel.innerText = `${prefix}${d.getDate()} ${RU_MONTHS[d.getMonth()]}`;
+  }
 }
 
 export function updateDayActionBar() {
@@ -242,6 +253,9 @@ export function createAppointmentCard(app) {
 }
 
 export function renderSchedule() {
+  updateDateNavLabel();
+  updateDayActionBar();
+
   const container = document.getElementById('appointmentsList');
   if (!container) return;
   container.innerHTML = '';

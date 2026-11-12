@@ -29,6 +29,7 @@ import {
   renderDateStripDots,
   renderSchedule,
   updateDateNavLabel,
+  updateDayActionBar,
   openAppointmentModal,
   handleAppointmentSubmit,
   handleAppointmentDelete,
@@ -987,12 +988,26 @@ export function getMasterBookingUrl(slug) {
 export function updateBookingLinkDisplay() {
   try {
     const inputSlug = document.getElementById('settingMasterSlug');
-    const slug = (inputSlug ? inputSlug.value.trim() : '') || 'demo';
-    const previewUrl = document.getElementById('settingBookingUrlPreview');
-    if (previewUrl) {
-      previewUrl.innerText = getMasterBookingUrl(slug);
+    let slug = (inputSlug ? inputSlug.value.trim().toLowerCase() : '');
+    if (!slug) {
+      slug = (state.currentMaster && state.currentMaster.slug) || safeStorage.get('hairstudio_master_slug', 'demo');
+      if (inputSlug) inputSlug.value = slug;
     }
-  } catch (e) {}
+    const fullUrl = getMasterBookingUrl(slug);
+
+    const linkText = document.getElementById('settingBookingLinkText') || document.getElementById('settingBookingUrlPreview');
+    if (linkText) {
+      linkText.innerText = fullUrl;
+    }
+
+    const profileLink = document.getElementById('authProfileBookingLink');
+    if (profileLink) {
+      profileLink.innerText = fullUrl;
+      profileLink.href = fullUrl;
+    }
+  } catch (e) {
+    console.warn('updateBookingLinkDisplay error:', e);
+  }
 }
 
 export function loadOnlineBookingSettings() {
@@ -1142,11 +1157,13 @@ export async function handleSaveOnlineBookingSettings() {
     }
   }
 
+  updateBookingLinkDisplay();
   showToast('Настройки онлайн-записи сохранены!');
 }
 
 export function handleCopyBookingLink() {
-  const slug = state.currentMaster?.slug || safeStorage.get('hairstudio_master_slug', 'demo');
+  const inputSlug = document.getElementById('settingMasterSlug');
+  const slug = (inputSlug ? inputSlug.value.trim().toLowerCase() : '') || state.currentMaster?.slug || safeStorage.get('hairstudio_master_slug', 'demo');
   const fullUrl = getMasterBookingUrl(slug);
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(fullUrl).then(() => {
@@ -1160,7 +1177,8 @@ export function handleCopyBookingLink() {
 }
 
 export function handleOpenBookingLink() {
-  const slug = state.currentMaster?.slug || safeStorage.get('hairstudio_master_slug', 'demo');
+  const inputSlug = document.getElementById('settingMasterSlug');
+  const slug = (inputSlug ? inputSlug.value.trim().toLowerCase() : '') || state.currentMaster?.slug || safeStorage.get('hairstudio_master_slug', 'demo');
   const fullUrl = getMasterBookingUrl(slug);
   window.open(fullUrl, '_blank');
 }
@@ -2163,33 +2181,39 @@ function setupEventListeners() {
   }
 
   // Date Navigation buttons
-  const btnToday = document.getElementById('btnToday');
+  const btnToday = document.getElementById('btnDateToday') || document.getElementById('btnToday');
   if (btnToday) {
     btnToday.addEventListener('click', () => {
       state.selectedDate = formatDateToYMD(new Date());
       setupDateStrip();
+      updateDateNavLabel();
+      updateDayActionBar();
       renderSchedule();
     });
   }
 
-  const btnPrevDay = document.getElementById('btnPrevDay');
-  if (btnPrevDay) {
-    btnPrevDay.addEventListener('click', () => {
+  const btnPrevNav = document.getElementById('btnDatePrevWeek') || document.getElementById('btnPrevDay');
+  if (btnPrevNav) {
+    btnPrevNav.addEventListener('click', () => {
       const d = parseYMD(state.selectedDate);
-      d.setDate(d.getDate() - 1);
+      d.setDate(d.getDate() - 7);
       state.selectedDate = formatDateToYMD(d);
       setupDateStrip();
+      updateDateNavLabel();
+      updateDayActionBar();
       renderSchedule();
     });
   }
 
-  const btnNextDay = document.getElementById('btnNextDay');
-  if (btnNextDay) {
-    btnNextDay.addEventListener('click', () => {
+  const btnNextNav = document.getElementById('btnDateNextWeek') || document.getElementById('btnNextDay');
+  if (btnNextNav) {
+    btnNextNav.addEventListener('click', () => {
       const d = parseYMD(state.selectedDate);
-      d.setDate(d.getDate() + 1);
+      d.setDate(d.getDate() + 7);
       state.selectedDate = formatDateToYMD(d);
       setupDateStrip();
+      updateDateNavLabel();
+      updateDayActionBar();
       renderSchedule();
     });
   }
@@ -2200,6 +2224,8 @@ function setupEventListeners() {
       if (e.target.value) {
         state.selectedDate = e.target.value;
         setupDateStrip();
+        updateDateNavLabel();
+        updateDayActionBar();
         renderSchedule();
       }
     });
@@ -2215,6 +2241,7 @@ function setupEventListeners() {
         strip.querySelectorAll('.date-card').forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         updateDateNavLabel();
+        updateDayActionBar();
         renderSchedule();
       }
     });
@@ -2736,6 +2763,8 @@ window.app = {
   openClientDetailsModal,
   openKaspiPayModal,
   exportTaxReportCSV,
+  loadOnlineBookingSettings,
+  updateBookingLinkDisplay,
   handleCreateTestMaster,
   handleFillTestMasterForm,
   handleSignIn,
@@ -2753,6 +2782,8 @@ window.openInventoryModal = openInventoryModal;
 window.openClientDetailsModal = openClientDetailsModal;
 window.openKaspiPayModal = openKaspiPayModal;
 window.exportTaxReportCSV = exportTaxReportCSV;
+window.loadOnlineBookingSettings = loadOnlineBookingSettings;
+window.updateBookingLinkDisplay = updateBookingLinkDisplay;
 window.handleCreateTestMaster = handleCreateTestMaster;
 window.handleFillTestMasterForm = handleFillTestMasterForm;
 window.handleSignIn = handleSignIn;
