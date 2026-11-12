@@ -16,12 +16,22 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
+  <!-- OpenGraph & Social Media Meta (Module 7) -->
+  <meta property="og:title" content="Онлайн-запись к бьюти-мастеру | Sheber">
+  <meta property="og:description" content="Удобная запись на стрижку, окрашивание и уход. Выберите услугу и удобное время без звонков.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="icons/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Онлайн-запись к бьюти-мастеру | Sheber">
+  <meta name="twitter:description" content="Удобная запись на стрижку, окрашивание и уход. Выберите услугу и удобное время без звонков.">
+  <meta name="twitter:image" content="icons/icon-512.png">
+
   <!-- Google Fonts: Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/book.css?v=40">
+  <link rel="stylesheet" href="css/book.css?v=41">
 </head>
 <body>
 
@@ -29,6 +39,12 @@
 
     <!-- 1. Master Profile Header -->
     <header class="master-header-card" id="masterHeader">
+      <!-- Language Switcher [ KZ | RU ] -->
+      <div class="lang-switch-wrap" id="langSwitch" aria-label="Тілді таңдау / Выбор языка">
+        <button type="button" class="lang-btn" data-lang="kk">KZ</button>
+        <button type="button" class="lang-btn active" data-lang="ru">RU</button>
+      </div>
+
       <div class="master-top-row">
         <div class="master-avatar" id="masterAvatar">✂️</div>
         <div class="master-meta">
@@ -44,13 +60,13 @@
 
       <div class="master-contacts-row">
         <a href="#" id="linkMasterWhatsapp" class="btn-contact whatsapp" target="_blank" rel="noopener">
-          <span>💬</span> Чат WhatsApp
+          <span>💬</span> <span id="labelWhatsappChat">Чат WhatsApp</span>
         </a>
         <a href="#" id="linkMaster2Gis" class="btn-contact twogis" target="_blank" rel="noopener">
-          <span>📍</span> 2ГИС (Маршрут)
+          <span>📍</span> <span id="label2GisRoute">2ГИС (Маршрут)</span>
         </a>
         <a href="#" id="linkMasterInstagram" class="btn-contact instagram" target="_blank" rel="noopener" style="display: none;">
-          <span>📷</span> Instagram
+          <span>📷</span> <span>Instagram</span>
         </a>
       </div>
     </header>
@@ -69,32 +85,99 @@
       </div>
     </div>
 
+    <!-- Client Self-Service Management View (Shown when URL has ?manage=TOKEN) -->
+    <div id="clientManageView" style="display: none; flex-direction: column; gap: 16px;">
+      <section class="section-card">
+        <div class="section-header" style="justify-content: space-between; align-items: center;">
+          <h2 class="section-title">
+            <span id="labelManageTitle">📱 Управление записью</span>
+          </h2>
+          <span id="manageStatusBadge" class="status-badge pending">Ожидает подтверждения</span>
+        </div>
+
+        <div class="manage-booking-details" style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+          <div class="manage-row">
+            <span class="manage-label" id="labelManageServices">Услуги:</span>
+            <strong id="manageServicesVal" style="color: var(--text-main);">--</strong>
+          </div>
+          <div class="manage-row">
+            <span class="manage-label" id="labelManageDate">Дата:</span>
+            <strong id="manageDateVal" style="color: var(--accent-gold-light);">--</strong>
+          </div>
+          <div class="manage-row">
+            <span class="manage-label" id="labelManageTime">Время:</span>
+            <strong id="manageTimeVal" style="color: var(--accent-gold-light);">--</strong>
+          </div>
+          <div class="manage-row">
+            <span class="manage-label" id="labelManageClient">Клиент:</span>
+            <span id="manageClientNameVal">--</span>
+          </div>
+          <div class="manage-row">
+            <span class="manage-label" id="labelManageMaster">Мастер:</span>
+            <span id="manageMasterVal">--</span>
+          </div>
+        </div>
+
+        <!-- Manage Action Buttons -->
+        <div id="manageActionsBox" style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+          <button type="button" id="btnManageReschedule" class="btn-contact twogis" style="width: 100%; justify-content: center; font-size: 14px; font-weight: 700; padding: 13px;">
+            <span>📅</span> <span id="labelBtnReschedule">Перенести на другое время</span>
+          </button>
+          <button type="button" id="btnManageCancel" class="btn-contact" style="width: 100%; justify-content: center; font-size: 14px; font-weight: 700; padding: 13px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171;">
+            <span>✕</span> <span id="labelBtnCancel">Отменить запись</span>
+          </button>
+          <a href="book.html" id="btnManageNewBooking" class="btn-contact whatsapp" style="display: none; width: 100%; justify-content: center; font-size: 14px; font-weight: 700; padding: 13px; text-decoration: none;">
+            <span>➕</span> <span id="labelBtnMakeNewBooking">Записаться снова</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- Reschedule Section (hidden until user clicks Reschedule) -->
+      <section id="manageRescheduleSection" class="section-card" style="display: none;">
+        <div class="section-header">
+          <h2 class="section-title">
+            <span id="labelChooseNewTime">🔄 Выберите новую дату и время</span>
+          </h2>
+        </div>
+        <div class="date-scroll-wrap" id="manageDateStrip"></div>
+        <div id="manageSlotsContainer" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;"></div>
+        <div style="margin-top: 16px; display: flex; gap: 10px;">
+          <button type="button" id="btnConfirmReschedule" class="btn-submit-booking" style="flex: 1;" disabled>
+            <span id="labelBtnConfirmNewTime">Подтвердить перенос</span>
+          </button>
+          <button type="button" id="btnCancelRescheduleMode" class="btn-success-action secondary" style="width: auto; padding: 10px 16px;">
+            <span id="labelBtnCancelReschedule">Назад</span>
+          </button>
+        </div>
+      </section>
+    </div>
+
     <div id="bookingStepsWrapper" style="display: flex; flex-direction: column; gap: 16px;">
       <!-- 2. Select Services (NO PRICES!) -->
       <section class="section-card">
         <div class="section-header">
           <h2 class="section-title">
-            <span>1. Выберите услуги</span>
+            <span id="labelStepServices">1. Выберите услуги</span>
           </h2>
           <span class="section-badge" id="selectedCountBadge">Выбрано: 0</span>
         </div>
 
         <!-- Categories Filter -->
         <div class="chips-row" id="serviceCategoryChips">
-          <button type="button" class="chip-btn active" data-category="all">Все</button>
-          <button type="button" class="chip-btn" data-category="Стрижки">Стрижки</button>
-          <button type="button" class="chip-btn" data-category="Окрашивание">Окрашивание</button>
-          <button type="button" class="chip-btn" data-category="Уход">Уход</button>
+          <button type="button" class="chip-btn active" data-category="all" id="chipCatAll">Все</button>
+          <button type="button" class="chip-btn" data-category="Стрижки" id="chipCatHaircuts">Стрижки</button>
+          <button type="button" class="chip-btn" data-category="Окрашивание" id="chipCatColoring">Окрашивание</button>
+          <button type="button" class="chip-btn" data-category="Уход" id="chipCatCare">Уход</button>
         </div>
 
         <!-- Services List (Duration only, no price) -->
         <div class="services-list" id="servicesList">
-          <div class="no-slots-alert">Загрузка услуг...</div>
+          <div class="no-slots-alert" id="labelLoadingServices">Загрузка услуг...</div>
         </div>
 
         <!-- Summary duration badge -->
         <div class="duration-summary" id="durationSummary" style="display: none;">
-          <span>⏱️ Расчетное время визита:</span>
+          <span id="labelDurationEst">⏱️ Расчетное время визита:</span>
           <strong id="totalDurationText">45 мин</strong>
         </div>
       </section>
@@ -103,7 +186,7 @@
       <section class="section-card">
         <div class="section-header">
           <h2 class="section-title">
-            <span>2. Дата и свободное время</span>
+            <span id="labelStepDateTime">2. Дата и свободное время</span>
           </h2>
         </div>
 
@@ -114,7 +197,7 @@
 
         <!-- Time Slots Grid -->
         <div id="slotsContainer" style="display: flex; flex-direction: column; gap: 12px;">
-          <div class="no-slots-alert">Выберите услугу и дату для отображения свободных окон</div>
+          <div class="no-slots-alert" id="labelSelectServiceAndDate">Выберите услугу и дату для отображения свободных окон</div>
         </div>
       </section>
 
@@ -122,22 +205,22 @@
       <section class="section-card">
         <div class="section-header">
           <h2 class="section-title">
-            <span>3. Ваши контакты</span>
+            <span id="labelStepContacts">3. Ваши контакты</span>
           </h2>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="clientNameInput">Ваше имя *</label>
+          <label class="form-label" for="clientNameInput" id="labelClientName">Ваше имя *</label>
           <input type="text" id="clientNameInput" class="form-input" placeholder="Например: Арман" required autocomplete="name">
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="clientPhoneInput">Номер WhatsApp *</label>
+          <label class="form-label" for="clientPhoneInput" id="labelClientPhone">Номер WhatsApp *</label>
           <input type="tel" id="clientPhoneInput" class="form-input" placeholder="+7 (701) 000-00-00" required autocomplete="tel">
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="clientNoteInput">Пожелание или комментарий (необязательно)</label>
+          <label class="form-label" for="clientNoteInput" id="labelClientNote">Пожелание или комментарий (необязательно)</label>
           <textarea id="clientNoteInput" class="form-textarea" placeholder="Длина волос, пожелания или вопросы..."></textarea>
         </div>
 
@@ -151,10 +234,10 @@
       <!-- Viral Growth Branding -->
       <footer class="booking-viral-footer" style="text-align: center; margin: 32px 0 110px; padding: 18px 12px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted);">
         <div style="font-weight: 600; color: var(--text-main); margin-bottom: 4px;">
-          ⚡ Работает на платформе <span style="color: var(--accent-gold-light); font-weight: 700;">Sheber</span>
+          ⚡ <span id="labelPlatformWorks">Работает на платформе</span> <span style="color: var(--accent-gold-light); font-weight: 700;">Sheber</span>
         </div>
-        <div>Онлайн-запись и учет для бьюти-мастеров и салонов</div>
-        <a href="index.html" style="display: inline-block; margin-top: 8px; color: var(--accent-gold-light); font-weight: 700; text-decoration: none; font-size: 13px;">
+        <div id="labelPlatformDesc">Онлайн-запись и учет для бьюти-мастеров и салонов</div>
+        <a href="index.html" id="linkPlatformCreate" style="display: inline-block; margin-top: 8px; color: var(--accent-gold-light); font-weight: 700; text-decoration: none; font-size: 13px;">
           Создать онлайн-запись для себя за 1 минуту →
         </a>
       </footer>
@@ -170,7 +253,7 @@
         <div class="bar-sub" id="barSelectedServicesLabel">Услуги не выбраны</div>
       </div>
       <button type="button" id="btnSubmitBooking" class="btn-submit-booking" disabled>
-        <span>Записаться</span>
+        <span id="labelBtnSubmit">Записаться</span>
         <span>→</span>
       </button>
     </div>
@@ -180,45 +263,65 @@
   <div id="modalBookingSuccess" class="success-modal">
     <div class="success-card">
       <div class="success-icon">🎉</div>
-      <h3 class="success-title">Заявка отправлена!</h3>
-      <p class="success-text">
+      <h3 class="success-title" id="labelSuccessTitle">Заявка отправлена!</h3>
+      <p class="success-text" id="labelSuccessText">
         Мастер проверит свой рабочий график и подтвердит вашу запись сообщением в WhatsApp.
       </p>
 
       <div class="success-details" id="successDetailsBox">
         <div class="success-detail-row">
-          <span>Дата:</span>
+          <span id="labelSuccessDate">Дата:</span>
           <strong id="successDateVal">--</strong>
         </div>
         <div class="success-detail-row">
-          <span>Время:</span>
+          <span id="labelSuccessTime">Время:</span>
           <strong id="successTimeVal">--</strong>
         </div>
         <div class="success-detail-row">
-          <span>Услуги:</span>
+          <span id="labelSuccessServices">Услуги:</span>
           <strong id="successServicesVal">--</strong>
         </div>
         <div class="success-detail-row">
-          <span>Мастер:</span>
+          <span id="labelSuccessMaster">Мастер:</span>
           <strong id="successMasterVal">--</strong>
         </div>
         <div class="success-detail-row">
-          <span>Адрес:</span>
+          <span id="labelSuccessAddress">Адрес:</span>
           <strong id="successAddressVal">--</strong>
         </div>
       </div>
 
+      <!-- Self-Service Manage Link Box -->
+      <div class="success-manage-box" id="successManageBox" style="margin: 14px 0; padding: 12px; background: rgba(245, 158, 11, 0.08); border: 1px dashed var(--border-accent); border-radius: var(--radius-md); text-align: left;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--accent-gold-light); text-transform: uppercase; margin-bottom: 4px;" id="labelManageLinkTitle">
+          🔑 Персональная ссылка для управления
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;" id="labelManageLinkDesc">
+          Сохраните эту ссылку, чтобы при необходимости самостоятельно отменить или перенести запись без звонков мастеру:
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="text" id="manageLinkInput" readonly style="flex: 1; font-size: 11px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); border-radius: var(--radius-sm); padding: 7px 8px;" onclick="this.select()">
+          <button type="button" id="btnCopyManageLink" style="flex-shrink: 0; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); padding: 7px 10px; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; font-weight: 600;">
+            📋 <span id="labelCopyBtn">Копировать</span>
+          </button>
+        </div>
+      </div>
+
+      <a href="#" id="btnOpenManageDirect" class="btn-success-action" style="background: rgba(245, 158, 11, 0.15); border: 1px solid var(--border-accent); color: var(--accent-gold-light); margin-bottom: 8px; text-decoration: none;">
+        📱 <span id="labelBtnManageSelf">Открыть страницу управления записью</span>
+      </a>
+
       <a href="#" id="btnOpenMasterWhatsappDirect" class="btn-success-action whatsapp" target="_blank" rel="noopener">
-        💬 Написать мастеру в WhatsApp
+        <span>💬</span> <span id="labelSuccessWhatsappBtn">Написать мастеру в WhatsApp</span>
       </a>
       <button type="button" id="btnCloseSuccess" class="btn-success-action secondary">
-        Закрыть
+        <span id="labelSuccessCloseBtn">Закрыть</span>
       </button>
     </div>
   </div>
 
   <!-- Scripts -->
-  <script src="js/supabase-sync.js?v=40"></script>
-  <script src="js/book.js?v=40"></script>
+  <script src="js/supabase-sync.js?v=41"></script>
+  <script src="js/book.js?v=41"></script>
 </body>
 </html>

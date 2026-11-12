@@ -23,7 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=40">
+  <link rel="stylesheet" href="css/style.css?v=41">
 
   <!-- Immediate Modal Controller (Guarantees instant modal response on phones before heavy JS loads) -->
   <script>
@@ -160,6 +160,17 @@
         <!-- Generated dynamically via JS -->
       </div>
 
+      <!-- Quick Day Action (Выходной / Рабочий) -->
+      <div class="day-action-bar" style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0 10px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="labelDayStatusText" style="font-size: 12px; color: var(--text-muted);">Статус дня: <strong id="valDayStatusText" style="color: var(--text-main);">Рабочий</strong></span>
+          <span id="badgeDayOff" class="status-badge cancelled" style="display: none; padding: 2px 8px; font-size: 11px;">Выходной</span>
+        </div>
+        <button type="button" id="btnToggleDayOff" class="btn-secondary" style="padding: 5px 12px; font-size: 12px; font-weight: 600; width: auto;">
+          🏖️ Сделать выходным
+        </button>
+      </div>
+
       <!-- Schedule Header Controls (Mobile Dropdowns & Density Switcher) -->
       <div class="schedule-toolbar">
         <div class="toolbar-item filter-item" style="display: none;">
@@ -234,23 +245,64 @@
       </div>
     </section>
 
-    <!-- TAB 4: EXPENSES & MATERIALS (РАСХОДНИКИ И ЗАКУПКИ) -->
+    <!-- TAB 4: EXPENSES & MATERIALS (РАСХОДНИКИ И СКЛАД) -->
     <section id="tab-expenses" class="tab-screen">
-      <div class="stat-card" style="margin-bottom: 12px; background: linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(17, 24, 39, 0.8) 100%); border-color: rgba(244, 63, 94, 0.3);">
-        <div class="stat-card-title">Расходы на материалы за месяц</div>
-        <div id="expensesMonthTotal" class="stat-card-value expense">0 ₸</div>
-        <div class="stat-card-sub">Краска, оксиды, расходники и аренда</div>
+      <!-- Subtabs switcher: Expenses Journal vs Warehouse Inventory -->
+      <div class="sub-tab-switcher" id="materialsSubTabSwitcher" style="display: flex; gap: 8px; margin-bottom: 14px;">
+        <button type="button" class="chip-btn active" id="btnSubTabExpenses" style="flex: 1; justify-content: center; padding: 10px 12px; font-weight: 600;">
+          💰 Журнал расходов
+        </button>
+        <button type="button" class="chip-btn" id="btnSubTabInventory" style="flex: 1; justify-content: center; padding: 10px 12px; font-weight: 600;">
+          📦 Склад остатков
+        </button>
       </div>
 
-      <div class="chips-filter" id="expenseCategoryFilter">
-        <button class="chip-btn active" data-category="all">Все</button>
-        <button class="chip-btn" data-category="Красители">Красители</button>
-        <button class="chip-btn" data-category="Расходники">Расходники</button>
-        <button class="chip-btn" data-category="Уход/Косметика">Уход/Косметика</button>
-        <button class="chip-btn" data-category="Аренда/Оборудование">Аренда</button>
+      <!-- SUBTAB 1: EXPENSES JOURNAL -->
+      <div id="materialsExpensesSection">
+        <div class="stat-card" style="margin-bottom: 12px; background: linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(17, 24, 39, 0.8) 100%); border-color: rgba(244, 63, 94, 0.3);">
+          <div class="stat-card-title">Расходы на материалы за месяц</div>
+          <div id="expensesMonthTotal" class="stat-card-value expense">0 ₸</div>
+          <div class="stat-card-sub">Краска, оксиды, расходники и аренда</div>
+        </div>
+
+        <div class="chips-filter" id="expenseCategoryFilter">
+          <button class="chip-btn active" data-category="all">Все</button>
+          <button class="chip-btn" data-category="Красители">Красители</button>
+          <button class="chip-btn" data-category="Расходники">Расходники</button>
+          <button class="chip-btn" data-category="Уход/Косметика">Уход/Косметика</button>
+          <button class="chip-btn" data-category="Аренда/Оборудование">Аренда</button>
+        </div>
+        <div id="expensesList" class="data-list">
+          <!-- Rendered via JS -->
+        </div>
       </div>
-      <div id="expensesList" class="data-list">
-        <!-- Rendered via JS -->
+
+      <!-- SUBTAB 2: WAREHOUSE INVENTORY (Module 4) -->
+      <div id="materialsInventorySection" style="display: none;">
+        <div class="stat-card" style="margin-bottom: 12px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(17, 24, 39, 0.8) 100%); border-color: rgba(245, 158, 11, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div>
+              <div class="stat-card-title">Склад материалов студии</div>
+              <div id="inventoryStatsTotal" class="stat-card-value" style="color: var(--accent-gold-light);">0 позиций</div>
+              <div class="stat-card-sub" id="inventoryStatsWarning">Все запасы в норме</div>
+            </div>
+            <button type="button" id="btnOpenAddInventory" class="btn-primary" style="width: auto; padding: 9px 13px; font-size: 12px; white-space: nowrap;">
+              ➕ Добавить
+            </button>
+          </div>
+        </div>
+
+        <div class="chips-filter" id="inventoryCategoryFilter">
+          <button class="chip-btn active" data-category="all">Все</button>
+          <button class="chip-btn" data-category="Красители">Красители</button>
+          <button class="chip-btn" data-category="Оксиды">Оксиды</button>
+          <button class="chip-btn" data-category="Расходники">Расходники</button>
+          <button class="chip-btn" data-category="Уход/Косметика">Уход/Косметика</button>
+        </div>
+
+        <div id="inventoryList" class="data-list">
+          <!-- Rendered via JS -->
+        </div>
       </div>
     </section>
 
@@ -308,6 +360,13 @@
           <!-- Rendered via JS -->
         </div>
       </div>
+
+      <!-- Tax Export for Kazakhstan e-Salyq / Form 910 (Module 6) -->
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+        <button type="button" id="btnExportTaxReport" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; font-weight: 700; font-size: 13px; background: linear-gradient(135deg, #059669 0%, #10b981 100%); border: none;">
+          <span>📥</span> <span>Налоговый отчет (Excel/CSV для 910 / e-Salyq)</span>
+        </button>
+      </div>
     </section>
 
   </main>
@@ -354,7 +413,26 @@
       <form id="formAppointment" class="modal-body">
         <input type="hidden" id="appId">
 
-        <div class="form-group">
+        <!-- Toggle: Appointment vs Break/Lunch -->
+        <div class="appointment-type-toggle" style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <button type="button" class="chip-btn active" id="btnAppTypeClient" style="flex: 1; justify-content: center; padding: 10px 8px; font-weight: 600;">
+            ✂️ Запись клиента
+          </button>
+          <button type="button" class="chip-btn" id="btnAppTypeBreak" style="flex: 1; justify-content: center; padding: 10px 8px; font-weight: 600;">
+            ☕ Личный перерыв / Обед
+          </button>
+        </div>
+        <input type="hidden" id="appType" value="client">
+
+        <!-- Break Info Banner (visible only if Break) -->
+        <div id="appBreakInfoSection" style="display: none; background: rgba(148, 163, 184, 0.1); border: 1px dashed #94a3b8; border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px;">
+          <div style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">☕ Личный перерыв / Обед</div>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+            Этот слот блокируется для онлайн-записи клиентов. В расписании он будет выделен нейтральным цветом.
+          </div>
+        </div>
+
+        <div id="appClientBlock" class="form-group">
           <label class="form-label">Клиент *</label>
           <div class="client-mode-toggle" id="clientModeToggle">
             <button type="button" class="chip-btn active" id="btnClientModeExisting">
@@ -430,24 +508,69 @@
         </div>
 
         <!-- Services Dropdown & Selected Chips -->
-        <div class="form-group">
-          <label class="form-label">Услуги * (можно выбрать несколько)</label>
-          <select id="appAddServiceSelect" class="form-select">
-            <option value="">➕ Выберите услугу для добавления...</option>
-          </select>
-          <div id="appSelectedServicesContainer" class="selected-services-box" style="margin-top: 8px;">
-            <!-- Rendered via JS: selected service chips -->
+        <div id="appServicesBlock">
+          <div class="form-group">
+            <label class="form-label">Услуги * (можно выбрать несколько)</label>
+            <select id="appAddServiceSelect" class="form-select">
+              <option value="">➕ Выберите услугу для добавления...</option>
+            </select>
+            <div id="appSelectedServicesContainer" class="selected-services-box" style="margin-top: 8px;">
+              <!-- Rendered via JS: selected service chips -->
+            </div>
           </div>
-        </div>
 
-        <div class="form-group">
-          <label class="form-label">Итоговая цена (₸) *</label>
-          <input type="number" id="appTotalPrice" class="form-input" min="0" step="50" placeholder="0 ₸" required>
+          <div class="form-group">
+            <label class="form-label">Итоговая цена (₸) *</label>
+            <input type="number" id="appTotalPrice" class="form-input" min="0" step="50" placeholder="0 ₸" required>
+          </div>
         </div>
 
         <div class="form-group">
           <label class="form-label">Израсходованные материалы (краска, оксид и др.)</label>
           <input type="text" id="appMaterialsUsed" class="form-input" placeholder="Например: Matrix 6N (40г) + оксид 6% (40г)">
+        </div>
+
+        <!-- Warehouse Materials Auto-Deduction Widget (Module 4) -->
+        <div id="appInventoryDeductSection" style="background: rgba(245, 158, 11, 0.08); border: 1px dashed var(--border-accent); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--accent-gold-light); margin: 0;">
+              📦 Списать материалы со склада
+            </label>
+            <span style="font-size: 10px; color: var(--text-muted);">Автовычитание остатка</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 8px; align-items: center;">
+            <select id="appDeductMaterialSelect" class="form-select" style="font-size: 12px; padding: 7px 8px;">
+              <option value="">-- Выберите со склада --</option>
+            </select>
+            <input type="number" id="appDeductAmount" class="form-input" placeholder="Кол-во" min="1" step="any" style="font-size: 12px; padding: 7px 8px;">
+            <button type="button" id="btnDeductFromInventory" class="btn-secondary" style="padding: 7px 12px; font-size: 12px; font-weight: 600; white-space: nowrap;">
+              Списать
+            </button>
+          </div>
+          <div id="appDeductedItemsList" style="margin-top: 6px; font-size: 11px; color: var(--accent-gold-light);"></div>
+        </div>
+
+        <!-- Module 5: Visit Photos (Before / Formula / Result) -->
+        <div class="visit-photos-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="form-label" style="margin-bottom: 0;">📸 Фотографии визита</label>
+            <span style="font-size: 10px; color: var(--accent-gold-light);">WebP сжатие</span>
+          </div>
+          <div class="visit-photos-grid">
+            <div class="photo-slot" data-slot-type="before" id="slotPhotoBefore" title="Добавить фото «До»">
+              <span style="font-size: 20px;">📸</span>
+              <span class="photo-slot-label">Фото «До»</span>
+            </div>
+            <div class="photo-slot" data-slot-type="formula" id="slotPhotoFormula" title="Добавить фото формулы">
+              <span style="font-size: 20px;">🧪</span>
+              <span class="photo-slot-label">Формула</span>
+            </div>
+            <div class="photo-slot" data-slot-type="result" id="slotPhotoResult" title="Добавить фото «После»">
+              <span style="font-size: 20px;">✨</span>
+              <span class="photo-slot-label">Результат</span>
+            </div>
+          </div>
+          <input type="file" id="appointmentPhotoFileInput" accept="image/*" style="display: none;">
         </div>
 
         <div class="form-group">
@@ -574,6 +697,84 @@
     </div>
   </div>
 
+  <!-- Modal: Inventory Item (Склад материалов - Module 4) -->
+  <div id="modalInventoryItem" class="modal-backdrop">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="modalInventoryTitle" class="modal-title">Материал на складе</h3>
+        <button class="modal-close" data-close="modalInventoryItem" onclick="window.closeModal('modalInventoryItem')">✕</button>
+      </div>
+      <form id="formInventoryItem" class="modal-body">
+        <input type="hidden" id="inventoryId">
+
+        <div class="form-group">
+          <label class="form-label">Наименование материала *</label>
+          <input type="text" id="inventoryName" class="form-input" placeholder="Например: Matrix Socolor 6N, Оксид 6%..." required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Категория *</label>
+          <select id="inventoryCategory" class="form-select">
+            <option value="Красители">Красители</option>
+            <option value="Оксиды">Оксиды</option>
+            <option value="Расходники">Расходники</option>
+            <option value="Уход/Косметика">Уход/Косметика</option>
+            <option value="Другое">Другое</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">Текущий остаток *</label>
+            <input type="number" id="inventoryStock" class="form-input" placeholder="120" min="0" step="any" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Единица *</label>
+            <select id="inventoryUnit" class="form-select">
+              <option value="г">г (грамм)</option>
+              <option value="мл">мл (миллилитр)</option>
+              <option value="шт">шт (штук)</option>
+              <option value="уп">уп (упаковок)</option>
+              <option value="рул">рул (рулонов)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Минимальный порог остатка (для предупреждения)</label>
+          <input type="number" id="inventoryMinThreshold" class="form-input" placeholder="Например: 30" min="0" step="any">
+          <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">
+            Когда остаток станет меньше или равен этому числу, появится плашка 🔴 «Заканчивается».
+          </span>
+        </div>
+
+        <div class="modal-footer" style="padding: 10px 0 0;">
+          <button type="button" id="btnDeleteInventoryItem" class="btn-danger" style="display: none;">Удалить со склада</button>
+          <button type="submit" class="btn-primary">Сохранить материал</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Photo Lightbox Preview (Module 5) -->
+  <div id="modalPhotoLightbox" class="modal-backdrop">
+    <div class="modal-sheet" style="max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="photoLightboxTitle" class="modal-title">Фотография</h3>
+        <button class="modal-close" data-close="modalPhotoLightbox" onclick="window.closeModal('modalPhotoLightbox')">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px;">
+        <img id="photoLightboxImg" src="" alt="Фото визита" style="max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: var(--radius-md);">
+        <div style="margin-top: 14px; width: 100%; display: flex; gap: 10px;">
+          <button type="button" id="btnDeleteCurrentPhoto" class="btn-danger" style="flex: 1;">🗑 Удалить фото</button>
+          <button type="button" class="btn-secondary" style="flex: 1;" onclick="window.closeModal('modalPhotoLightbox')">Закрыть</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal 4: Client Details Modal (Карточка клиента) -->
   <div id="modalClientDetails" class="modal-backdrop">
     <div class="modal-sheet">
@@ -600,6 +801,13 @@
           <button type="button" id="btnBookThisClient" class="btn-primary" style="margin-top: 10px; width: 100%;">📅 Создать запись для этого клиента</button>
           <button type="button" id="btnMergeClient" class="btn-secondary" style="margin-top: 8px; width: 100%; font-size: 12px;">🔗 Объединить с дубликатом</button>
           <button type="button" id="btnDeleteClient" class="btn-danger" style="margin-top: 8px; width: 100%; font-size: 12px;">🗑️ Удалить клиента из базы</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">📸 Фотографии работ (До / После / Формулы)</label>
+          <div id="clientPhotosGallery" class="visit-photos-grid" style="margin-top: 6px;">
+            <!-- Rendered via JS -->
+          </div>
         </div>
 
         <div class="form-group">
@@ -1000,6 +1208,15 @@
           </span>
         </div>
 
+        <!-- Рабочие дни недели (Гибкий график мастера) -->
+        <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 14px;">
+          <label class="form-label">🗓 Рабочие дни недели</label>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
+            Отметьте дни недели, в которые вы принимаете клиентов. Неотмеченные дни блокируются на странице онлайн-записи.
+          </p>
+          <div id="weeklyScheduleEditor" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
         <!-- Онлайн-запись для клиентов -->
         <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 14px;">
           <label class="form-label">🌐 Онлайн-запись для клиентов</label>
@@ -1119,8 +1336,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/supabase-sync.js?v=40"></script>
-  <script src="js/db.js?v=40"></script>
-  <script type="module" src="js/app.js?v=40"></script>
+  <script src="js/supabase-sync.js?v=41"></script>
+  <script src="js/db.js?v=41"></script>
+  <script type="module" src="js/app.js?v=41"></script>
 </body>
 </html>

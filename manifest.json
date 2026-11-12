@@ -27,5 +27,28 @@
       "type": "image/jpeg",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Новая запись",
+      "short_name": "Запись",
+      "description": "Быстро создать новую запись клиента",
+      "url": "./index.html?action=new_appointment",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Расписание",
+      "short_name": "График",
+      "description": "Посмотреть расписание на сегодня",
+      "url": "./index.html?action=schedule",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Записать расход",
+      "short_name": "Расход",
+      "description": "Добавить расход на материалы или аренду",
+      "url": "./index.html?action=new_expense",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

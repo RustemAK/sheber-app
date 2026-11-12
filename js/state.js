@@ -18,6 +18,7 @@ export const state = {
   services: [],
   appointments: [],
   expenses: [],
+  inventory: [],
   clients: [],
   clientNotes: [],
   pendingBookings: [],
@@ -31,8 +32,35 @@ export const state = {
   appointmentClientMode: 'existing',
   scheduleViewMode: 'timeline',
   workStartHour: 8,
-  workEndHour: 22
+  workEndHour: 22,
+  weeklySchedule: {
+    1: { enabled: true, start: '09:00', end: '20:00' },
+    2: { enabled: true, start: '09:00', end: '20:00' },
+    3: { enabled: true, start: '09:00', end: '20:00' },
+    4: { enabled: true, start: '09:00', end: '20:00' },
+    5: { enabled: true, start: '09:00', end: '20:00' },
+    6: { enabled: true, start: '10:00', end: '19:00' },
+    0: { enabled: false, start: '10:00', end: '18:00' }
+  },
+  dayOverrides: {}
 };
+
+/**
+ * Check if a date (YYYY-MM-DD) is marked as a day off
+ */
+export function isDateDayOff(dateStr) {
+  if (state.dayOverrides && state.dayOverrides[dateStr]) {
+    return state.dayOverrides[dateStr] === 'day_off';
+  }
+  if (state.weeklySchedule) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dayOfWeek = dateObj.getDay();
+    const cfg = state.weeklySchedule[dayOfWeek];
+    if (cfg && cfg.enabled === false) return true;
+  }
+  return false;
+}
 
 // O(1) lookup indices
 export const indices = {

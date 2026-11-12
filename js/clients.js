@@ -213,7 +213,64 @@ export function openClientDetailsModal(client, clientApps, onOpenAppointment) {
     }
   }
 
+  // Client Photos Gallery (Module 5)
+  const photosBox = document.getElementById('clientPhotosGallery');
+  if (photosBox && window.db && window.db.getClientPhotos) {
+    photosBox.innerHTML = '<div style="font-size: 11px; color: var(--text-muted); grid-column: 1 / -1;">Загрузка фото...</div>';
+    window.db.getClientPhotos(client.id).then(photos => {
+      if (!photos || photos.length === 0) {
+        photosBox.innerHTML = '<div style="font-size: 12px; color: var(--text-muted); grid-column: 1 / -1; padding: 6px 0;">Фотографий работ пока нет</div>';
+        return;
+      }
+      photosBox.innerHTML = photos.map(p => `
+        <div class="photo-slot has-image" data-photo-id="${p.id}" style="cursor: pointer;">
+          <img src="${p.dataUrl}" alt="${p.slotType || 'photo'}">
+          <span class="photo-slot-badge">${p.slotType === 'before' ? 'До' : (p.slotType === 'formula' ? 'Формула' : 'Результат')}</span>
+        </div>
+      `).join('');
+
+      photosBox.querySelectorAll('.photo-slot').forEach(slot => {
+        slot.onclick = () => {
+          const pid = slot.dataset.photoId;
+          const photo = photos.find(ph => String(ph.id) === String(pid));
+          if (photo) openPhotoLightbox(photo);
+        };
+      });
+    }).catch(e => {
+      console.warn('Failed loading client photos:', e);
+      if (photosBox) photosBox.innerHTML = '';
+    });
+  }
+
   if (window.openModal) window.openModal('modalClientDetails');
+}
+
+export function openPhotoLightbox(photo) {
+  const img = document.getElementById('photoLightboxImg');
+  const title = document.getElementById('photoLightboxTitle');
+  const btnDel = document.getElementById('btnDeleteCurrentPhoto');
+
+  if (img) img.src = photo.dataUrl;
+  if (title) {
+    const slotLabel = photo.slotType === 'before' ? 'Фото «До»' : (photo.slotType === 'formula' ? 'Формула окрашивания' : 'Результат работы');
+    title.innerText = slotLabel;
+  }
+
+  if (btnDel) {
+    btnDel.onclick = async () => {
+      if (confirm('Удалить эту фотографию?')) {
+        await window.db.deletePhoto(photo.id);
+        if (window.closeModal) window.closeModal('modalPhotoLightbox');
+        showToast('Фото удалено');
+      }
+    };
+  }
+
+  if (window.openModal) window.openModal('modalPhotoLightbox');
+}
+
+if (typeof window !== 'undefined') {
+  window.openPhotoLightbox = openPhotoLightbox;
 }
 
 export async function handleSaveClientNotes(onDataChanged) {

@@ -4,7 +4,7 @@
  * Handles date navigation, hourly timeline, appointment cards, conflict checking and CRUD modals.
  */
 
-import { state, getAppointmentsForDate } from './state.js';
+import { state, getAppointmentsForDate, isDateDayOff } from './state.js';
 import { 
   escapeHtml, 
   parseYMD, 
@@ -18,7 +18,8 @@ import {
   formatCurrency, 
   RU_DAYS, 
   RU_MONTHS, 
-  showToast 
+  showToast,
+  compressImageToWebP
 } from './utils.js';
 
 export function updateDateNavLabel() {
@@ -42,6 +43,47 @@ export function updateDateNavLabel() {
   label.innerText = `${prefix}${d.getDate()} ${RU_MONTHS[d.getMonth()]}`;
 }
 
+export function updateDayActionBar() {
+  const valText = document.getElementById('valDayStatusText');
+  const badgeOff = document.getElementById('badgeDayOff');
+  const btnToggle = document.getElementById('btnToggleDayOff');
+  if (!valText || !btnToggle) return;
+
+  const isOff = isDateDayOff(state.selectedDate);
+  if (isOff) {
+    valText.innerText = 'Выходной';
+    valText.style.color = '#f87171';
+    if (badgeOff) badgeOff.style.display = 'inline-block';
+    btnToggle.innerText = '💼 Сделать рабочим';
+  } else {
+    valText.innerText = 'Рабочий';
+    valText.style.color = 'var(--text-main)';
+    if (badgeOff) badgeOff.style.display = 'none';
+    btnToggle.innerText = '🏖️ Сделать выходным';
+  }
+
+  if (!btnToggle._hasToggleListener) {
+    btnToggle._hasToggleListener = true;
+    btnToggle.addEventListener('click', async () => {
+      const currentlyOff = isDateDayOff(state.selectedDate);
+      if (!state.dayOverrides) state.dayOverrides = {};
+      state.dayOverrides[state.selectedDate] = currentlyOff ? 'working' : 'day_off';
+      try {
+        localStorage.setItem('hairstudio_day_overrides', JSON.stringify(state.dayOverrides));
+      } catch (e) {}
+
+      showToast(currentlyOff 
+        ? `День ${state.selectedDate} отмечен как рабочий` 
+        : `День ${state.selectedDate} отмечен как выходной`
+      );
+
+      setupDateStrip();
+      renderSchedule();
+      triggerAutoSyncSlots();
+    });
+  }
+}
+
 export function setupDateStrip(baseDate = null) {
   const strip = document.getElementById('dateStrip');
   if (!strip) return;
@@ -56,9 +98,10 @@ export function setupDateStrip(baseDate = null) {
     const dateStr = formatDateToYMD(d);
     const hasApps = getAppointmentsForDate(dateStr).length > 0;
     const isActive = dateStr === state.selectedDate;
+    const isDayOff = isDateDayOff(dateStr);
 
     const card = document.createElement('div');
-    card.className = `date-card${isActive ? ' active' : ''}${hasApps ? ' has-appointments' : ''}`;
+    card.className = `date-card${isActive ? ' active' : ''}${hasApps ? ' has-appointments' : ''}${isDayOff ? ' is-day-off' : ''}`;
     card.dataset.date = dateStr;
 
     card.innerHTML = `
@@ -74,6 +117,7 @@ export function setupDateStrip(baseDate = null) {
   strip.appendChild(fragment);
 
   updateDateNavLabel();
+  updateDayActionBar();
 
   requestAnimationFrame(() => {
     const activeCard = strip.querySelector('.date-card.active');
@@ -97,15 +141,16 @@ export function renderDateStripDots() {
 }
 
 export function createAppointmentCard(app) {
+  const isBreak = Boolean(app.isBreak || app.type === 'break' || (app.clientName && app.clientName.includes('Перерыв')));
   const isCompact = state.cardDensity === 'compact';
   const isPast = isAppointmentPast(app);
   const card = document.createElement('div');
-  card.className = 'appointment-card' + (isPast ? ' is-past' : '') + (app.status === 'cancelled' ? ' status-cancelled' : '') + (isCompact ? ' compact' : '');
+  card.className = 'appointment-card' + (isPast ? ' is-past' : '') + (app.status === 'cancelled' ? ' status-cancelled' : '') + (isCompact ? ' compact' : '') + (isBreak ? ' is-break' : '');
   card.dataset.appId = app.id;
 
   const phoneClean = cleanPhoneForWhatsapp(app.clientPhone);
-  const waLink = phoneClean ? `https://wa.me/${phoneClean}` : null;
-  const telLink = phoneClean ? `tel:${cleanPhoneForTel(app.clientPhone)}` : null;
+  const waLink = (!isBreak && phoneClean) ? `https://wa.me/${phoneClean}` : null;
+  const telLink = (!isBreak && phoneClean) ? `tel:${cleanPhoneForTel(app.clientPhone)}` : null;
 
   if (isCompact) {
     const servicesSummary = (app.services || []).map(s => escapeHtml(s.name)).join(', ');
@@ -232,6 +277,21 @@ export function renderSchedule() {
   }
 
   let dayApps = state.appointments.filter(a => a.date === state.selectedDate);
+
+  if (isDateDayOff(state.selectedDate)) {
+    const dayOffBanner = document.createElement('div');
+    dayOffBanner.className = 'day-off-banner';
+    dayOffBanner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 18px;">🏖️</span>
+        <div>
+          <strong style="color: #f87171; font-size: 13px;">Этот день отмечен как выходной</strong>
+          <div style="font-size: 11px; color: var(--text-muted);">Онлайн-запись для клиентов на этот день заблокирована</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(dayOffBanner);
+  }
 
   if (state.scheduleFilter !== 'all') {
     dayApps = dayApps.filter(a => a.status === state.scheduleFilter);
@@ -367,6 +427,44 @@ export function openAppointmentModal(app = null, preselectedClient = null, defau
   if (modalTitle) modalTitle.innerText = app ? 'Редактирование записи' : 'Новая запись';
   if (btnDelete) btnDelete.style.display = app ? 'block' : 'none';
 
+  // Toggle client vs break
+  const btnAppTypeClient = document.getElementById('btnAppTypeClient');
+  const btnAppTypeBreak = document.getElementById('btnAppTypeBreak');
+  const appTypeInput = document.getElementById('appType');
+  const appClientBlock = document.getElementById('appClientBlock');
+  const appServicesBlock = document.getElementById('appServicesBlock');
+  const appBreakInfo = document.getElementById('appBreakInfoSection');
+  const totalPriceInput = document.getElementById('appTotalPrice');
+
+  const setAppointmentType = (type) => {
+    if (appTypeInput) appTypeInput.value = type;
+    if (type === 'break') {
+      if (btnAppTypeBreak) btnAppTypeBreak.classList.add('active');
+      if (btnAppTypeClient) btnAppTypeClient.classList.remove('active');
+      if (appClientBlock) appClientBlock.style.display = 'none';
+      if (appServicesBlock) appServicesBlock.style.display = 'none';
+      if (appBreakInfo) appBreakInfo.style.display = 'block';
+      if (modalTitle) modalTitle.innerText = app ? 'Редактирование перерыва' : 'Личный перерыв / Обед';
+      if (totalPriceInput) totalPriceInput.value = 0;
+    } else {
+      if (btnAppTypeClient) btnAppTypeClient.classList.add('active');
+      if (btnAppTypeBreak) btnAppTypeBreak.classList.remove('active');
+      if (appClientBlock) appClientBlock.style.display = 'block';
+      if (appServicesBlock) appServicesBlock.style.display = 'block';
+      if (appBreakInfo) appBreakInfo.style.display = 'none';
+      if (modalTitle) modalTitle.innerText = app ? 'Редактирование записи' : 'Новая запись';
+    }
+  };
+
+  if (btnAppTypeClient && !btnAppTypeClient._hasTypeListener) {
+    btnAppTypeClient._hasTypeListener = true;
+    btnAppTypeClient.addEventListener('click', () => setAppointmentType('client'));
+    if (btnAppTypeBreak) btnAppTypeBreak.addEventListener('click', () => setAppointmentType('break'));
+  }
+
+  const isBreak = Boolean(app && (app.isBreak || app.type === 'break' || (app.clientName && app.clientName.includes('Перерыв'))));
+  setAppointmentType(isBreak ? 'break' : 'client');
+
   const clientSelect = document.getElementById('appExistingClientSelect');
   if (clientSelect) {
     clientSelect.innerHTML = '<option value="">-- Выберите клиента из базы --</option>';
@@ -481,6 +579,152 @@ export function openAppointmentModal(app = null, preselectedClient = null, defau
     if (phoneInput) phoneInput.value = '';
   }
 
+  // Warehouse materials auto-deduction (Module 4)
+  const deductSelect = document.getElementById('appDeductMaterialSelect');
+  const deductListEl = document.getElementById('appDeductedItemsList');
+  if (deductListEl) deductListEl.innerHTML = '';
+
+  if (deductSelect) {
+    deductSelect.innerHTML = '<option value="">-- Выберите со склада --</option>';
+    (state.inventory || []).forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = `${item.name} (${item.current_stock} ${item.unit || 'г'})`;
+      deductSelect.appendChild(opt);
+    });
+  }
+
+  const btnDeduct = document.getElementById('btnDeductFromInventory');
+  if (btnDeduct && !btnDeduct._hasDeductListener) {
+    btnDeduct._hasDeductListener = true;
+    btnDeduct.addEventListener('click', async () => {
+      const select = document.getElementById('appDeductMaterialSelect');
+      const amountInp = document.getElementById('appDeductAmount');
+      const matId = select ? select.value : '';
+      const amount = Number(amountInp ? amountInp.value : 0);
+
+      if (!matId || amount <= 0) {
+        showToast('Выберите материал и укажите количество для списания', 'error');
+        return;
+      }
+
+      const item = state.inventory.find(i => String(i.id) === String(matId));
+      if (!item) return;
+
+      try {
+        await window.db.deductInventoryStock(matId, amount);
+        item.current_stock = Math.max(0, (Number(item.current_stock) || 0) - amount);
+
+        // Append to materials used field
+        const materialsInput = document.getElementById('appMaterialsUsed');
+        if (materialsInput) {
+          const currentVal = materialsInput.value.trim();
+          const addition = `${item.name} (-${amount} ${item.unit || 'г'})`;
+          materialsInput.value = currentVal ? `${currentVal}, ${addition}` : addition;
+        }
+
+        const deductList = document.getElementById('appDeductedItemsList');
+        if (deductList) {
+          const row = document.createElement('div');
+          row.innerText = `✓ Списано: ${item.name} (-${amount} ${item.unit || 'г'})`;
+          deductList.appendChild(row);
+        }
+
+        if (amountInp) amountInp.value = '';
+        showToast(`Со склада списано: ${amount} ${item.unit || 'г'} (${item.name})`);
+      } catch (err) {
+        console.error(err);
+        showToast('Ошибка списания со склада', 'error');
+      }
+    });
+  }
+
+  // Visit Photos (Module 5)
+  let targetPhotoSlot = 'before';
+  const fileInput = document.getElementById('appointmentPhotoFileInput');
+
+  async function renderAppointmentPhotos() {
+    const appId = state.editingAppointmentId;
+    let photos = [];
+    if (appId && window.db && window.db.getAppointmentPhotos) {
+      photos = await window.db.getAppointmentPhotos(appId);
+    }
+
+    const slots = ['before', 'formula', 'result'];
+    slots.forEach(slotType => {
+      const slotEl = document.querySelector(`.photo-slot[data-slot-type="${slotType}"]`);
+      if (!slotEl) return;
+
+      const p = photos.find(ph => ph.slotType === slotType);
+      if (p && p.dataUrl) {
+        slotEl.classList.add('has-image');
+        slotEl.innerHTML = `
+          <img src="${p.dataUrl}" alt="${slotType}">
+          <span class="photo-slot-badge">${slotType === 'before' ? 'До' : (slotType === 'formula' ? 'Формула' : 'Результат')}</span>
+          <button type="button" class="photo-slot-delete" data-photo-id="${p.id}" title="Удалить фото">✕</button>
+        `;
+        slotEl.onclick = (e) => {
+          if (e.target.closest('.photo-slot-delete')) return;
+          if (window.openPhotoLightbox) window.openPhotoLightbox(p);
+        };
+        const delBtn = slotEl.querySelector('.photo-slot-delete');
+        if (delBtn) {
+          delBtn.onclick = async (e) => {
+            e.stopPropagation();
+            if (confirm('Удалить эту фотографию?')) {
+              await window.db.deletePhoto(p.id);
+              renderAppointmentPhotos();
+              showToast('Фото удалено');
+            }
+          };
+        }
+      } else {
+        slotEl.classList.remove('has-image');
+        const icon = slotType === 'before' ? '📸' : (slotType === 'formula' ? '🧪' : '✨');
+        const label = slotType === 'before' ? 'Фото «До»' : (slotType === 'formula' ? 'Формула' : 'Результат');
+        slotEl.innerHTML = `
+          <span style="font-size: 20px;">${icon}</span>
+          <span class="photo-slot-label">${label}</span>
+        `;
+        slotEl.onclick = () => {
+          targetPhotoSlot = slotType;
+          if (fileInput) fileInput.click();
+        };
+      }
+    });
+  }
+
+  renderAppointmentPhotos();
+
+  if (fileInput && !fileInput._hasFileListener) {
+    fileInput._hasFileListener = true;
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      try {
+        showToast('Сжатие в WebP...');
+        const compressed = await compressImageToWebP(file, 1200, 0.82);
+        
+        await window.db.addPhoto({
+          appointment_id: Number(state.editingAppointmentId) || 0,
+          client_id: Number(state.viewingClientId) || 0,
+          slotType: targetPhotoSlot,
+          dataUrl: compressed.dataUrl,
+          created_at: new Date().toISOString()
+        });
+
+        showToast('Фото сохранено (WebP)!');
+        renderAppointmentPhotos();
+      } catch (err) {
+        console.error(err);
+        showToast('Ошибка обработки фото: ' + err.message, 'error');
+      } finally {
+        fileInput.value = '';
+      }
+    });
+  }
+
   if (window.openModal) window.openModal('modalAppointment');
 }
 
@@ -536,27 +780,37 @@ export async function handleAppointmentSubmit(e, onDataChanged) {
   if (submitBtn) { if (submitBtn.disabled) return; submitBtn.disabled = true; }
 
   try {
-    const selectedServices = [];
-    state.selectedServicesForAppointment.forEach(id => {
-      const s = state.services.find(item => String(item.id) === String(id));
-      if (s) {
-        selectedServices.push({
-          name: s.name,
-          price: Number(s.price),
-          duration: Number(s.duration)
-        });
-      }
-    });
+    const appType = (document.getElementById('appType') ? document.getElementById('appType').value : 'client');
+    const isBreak = (appType === 'break');
 
-    if (selectedServices.length === 0) {
-      showToast('Пожалуйста, выберите хотя бы одну услугу', 'error');
-      return;
+    let selectedServices = [];
+    if (!isBreak) {
+      state.selectedServicesForAppointment.forEach(id => {
+        const s = state.services.find(item => String(item.id) === String(id));
+        if (s) {
+          selectedServices.push({
+            name: s.name,
+            price: Number(s.price),
+            duration: Number(s.duration)
+          });
+        }
+      });
+
+      if (selectedServices.length === 0) {
+        showToast('Пожалуйста, выберите хотя бы одну услугу', 'error');
+        return;
+      }
+    } else {
+      selectedServices = [{ name: 'Личный перерыв / Обед', price: 0, duration: 60 }];
     }
 
     let clientName = '';
     let clientPhone = '';
 
-    if (state.appointmentClientMode === 'existing') {
+    if (isBreak) {
+      clientName = '☕ Перерыв / Обед';
+      clientPhone = '';
+    } else if (state.appointmentClientMode === 'existing') {
       const select = document.getElementById('appExistingClientSelect');
       const selectedId = select ? select.value : '';
       const client = state.clients.find(c => String(c.id) === String(selectedId));
@@ -607,25 +861,27 @@ export async function handleAppointmentSubmit(e, onDataChanged) {
       startTime,
       endTime,
       services: selectedServices,
-      totalPrice: Number(document.getElementById('appTotalPrice').value) || 0,
-      materialsUsed: document.getElementById('appMaterialsUsed').value.trim(),
+      totalPrice: isBreak ? 0 : (Number(document.getElementById('appTotalPrice').value) || 0),
+      materialsUsed: isBreak ? '' : document.getElementById('appMaterialsUsed').value.trim(),
       notes: document.getElementById('appNotes').value.trim(),
       status: document.getElementById('appStatus').value,
-      channel: (document.getElementById('appChannel') ? document.getElementById('appChannel').value : '') || 'phone',
+      channel: isBreak ? 'break' : ((document.getElementById('appChannel') ? document.getElementById('appChannel').value : '') || 'phone'),
+      isBreak,
+      type: isBreak ? 'break' : 'appointment',
       updated_at: new Date().toISOString()
     };
 
     if (state.editingAppointmentId) {
       appData.id = Number(state.editingAppointmentId);
       await window.db.updateAppointment(appData);
-      showToast('Запись успешно обновлена');
+      showToast(isBreak ? 'Перерыв обновлен' : 'Запись успешно обновлена');
     } else {
       appData.createdAt = new Date().toISOString();
       await window.db.addAppointment(appData);
-      showToast('Запись клиента успешно создана');
+      showToast(isBreak ? 'Перерыв добавлен в расписание' : 'Запись клиента успешно создана');
     }
 
-    if (clientName) {
+    if (!isBreak && clientName) {
       try {
         await window.db.saveClientIfNotExists({
           name: clientName,
@@ -660,8 +916,24 @@ export async function triggerAutoSyncSlots() {
   if (!window.HairSupabase || !window.HairSupabase.isConfigured()) return;
   const masterId = state.currentMaster ? state.currentMaster.id : null;
   if (!masterId) return;
+
+  // Combine regular appointments with day off full-day busy slots
+  const allSlots = [...state.appointments];
+  if (state.dayOverrides) {
+    Object.keys(state.dayOverrides).forEach(dateStr => {
+      if (state.dayOverrides[dateStr] === 'day_off') {
+        allSlots.push({
+          date: dateStr,
+          startTime: '00:00',
+          endTime: '23:59',
+          status: 'confirmed'
+        });
+      }
+    });
+  }
+
   try {
-    await window.HairSupabase.syncMasterBusySlots(masterId, state.appointments);
+    await window.HairSupabase.syncMasterBusySlots(masterId, allSlots);
   } catch (err) {
     console.warn('Auto-sync slots error:', err);
   }

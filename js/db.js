@@ -6,7 +6,7 @@
 class HairStudioDB {
   constructor() {
     this.dbName = 'HairStudioDB';
-    this.dbVersion = 3;
+    this.dbVersion = 4;
     this.db = null;
   }
 
@@ -65,6 +65,22 @@ class HairStudioDB {
         if (!db.objectStoreNames.contains('backups')) {
           const backupStore = db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
           backupStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+
+        // Inventory / Warehouse materials store (Module 4)
+        if (!db.objectStoreNames.contains('inventory')) {
+          const invStore = db.createObjectStore('inventory', { keyPath: 'id', autoIncrement: true });
+          invStore.createIndex('name', 'name', { unique: false });
+          invStore.createIndex('category', 'category', { unique: false });
+          invStore.createIndex('updated_at', 'updated_at', { unique: false });
+        }
+
+        // Client photos store (Module 5: Before / After gallery)
+        if (!db.objectStoreNames.contains('client_photos')) {
+          const photoStore = db.createObjectStore('client_photos', { keyPath: 'id', autoIncrement: true });
+          photoStore.createIndex('client_id', 'client_id', { unique: false });
+          photoStore.createIndex('appointment_id', 'appointment_id', { unique: false });
+          photoStore.createIndex('created_at', 'created_at', { unique: false });
         }
       };
 
@@ -441,11 +457,116 @@ class HairStudioDB {
     }
   }
 
+  // ================= INVENTORY STORE (Module 4) =================
+  async getInventory() {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['inventory'], 'readonly');
+      const store = tx.objectStore('inventory');
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async addInventoryItem(item) {
+    item.updated_at = new Date().toISOString();
+    return this._tx('inventory', 'readwrite', (store) => store.add(item));
+  }
+
+  async updateInventoryItem(item) {
+    item.updated_at = new Date().toISOString();
+    return this._tx('inventory', 'readwrite', (store) => store.put(item));
+  }
+
+  async deleteInventoryItem(id) {
+    return this._tx('inventory', 'readwrite', (store) => store.delete(Number(id)));
+  }
+
+  async deductInventoryStock(id, amount) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['inventory'], 'readwrite');
+      const store = tx.objectStore('inventory');
+      const request = store.get(Number(id));
+      request.onsuccess = () => {
+        const item = request.result;
+        if (!item) {
+          resolve(null);
+          return;
+        }
+        item.current_stock = Math.max(0, (Number(item.current_stock) || 0) - Number(amount));
+        item.updated_at = new Date().toISOString();
+        const putReq = store.put(item);
+        putReq.onsuccess = () => resolve(item);
+        putReq.onerror = () => reject(putReq.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // ================= CLIENT PHOTOS STORE (Module 5) =================
+  async getClientPhotos(clientId) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['client_photos'], 'readonly');
+      const store = tx.objectStore('client_photos');
+      const index = store.index('client_id');
+      const request = index.getAll(Number(clientId));
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAppointmentPhotos(appointmentId) {
+    await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['client_photos'], 'readonly');
+      const store = tx.objectStore('client_photos');
+      const index = store.index('appointment_id');
+      const request = index.getAll(Number(appointmentId));
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async addPhoto(photoRecord) {
+    photoRecord.created_at = photoRecord.created_at || new Date().toISOString();
+    return this._tx('client_photos', 'readwrite', (store) => store.add(photoRecord));
+  }
+
+  async deletePhoto(id) {
+    return this._tx('client_photos', 'readwrite', (store) => store.delete(Number(id)));
+  }
+
   // ================= SEED DATA =================
   async checkSeedData() {
     const services = await this.getServices();
     if (services.length === 0) {
       await this.loadSeedData();
+    }
+
+    try {
+      const inventory = await this.getInventory();
+      if (inventory.length === 0) {
+        await this.loadSeedInventory();
+      }
+    } catch (e) {
+      console.warn('Seed inventory error:', e);
+    }
+  }
+
+  async loadSeedInventory() {
+    const defaultInventory = [
+      { name: 'Matrix Socolor 6N (Темный блондин)', category: 'Красители', current_stock: 120, unit: 'г', min_threshold: 30 },
+      { name: 'Matrix Оксидант 6% (20 vol)', category: 'Красители', current_stock: 450, unit: 'мл', min_threshold: 100 },
+      { name: 'L\'Oreal Pro Шампунь для окрашенных', category: 'Уход/Косметика', current_stock: 150, unit: 'мл', min_threshold: 200 },
+      { name: 'Нитриловые перчатки черные L', category: 'Расходники', current_stock: 12, unit: 'пар', min_threshold: 20 },
+      { name: 'Фольга парикмахерская 100м', category: 'Расходники', current_stock: 3, unit: 'рул', min_threshold: 1 }
+    ];
+
+    for (const item of defaultInventory) {
+      await this.addInventoryItem(item);
     }
   }
 

@@ -892,6 +892,8 @@
       formattedPhone = `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 11)}`;
     }
 
+    const manageToken = bookingData.manage_token || ('sh_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
+
     const payload = {
       master_id: bookingData.master_id || mockStore.master.id,
       client_name: String(bookingData.client_name).trim(),
@@ -902,8 +904,19 @@
       service_names: String(bookingData.service_names || 'Услуга мастера'),
       duration_min: Number(bookingData.duration_min) || 60,
       client_note: String(bookingData.client_note || '').trim(),
+      manage_token: manageToken,
       status: 'pending'
     };
+
+    function saveToClientLocalHistory(item) {
+      try {
+        const key = 'sheber_client_bookings_v1';
+        const list = JSON.parse(localStorage.getItem(key) || '[]');
+        list.unshift(item);
+        if (list.length > 50) list.pop();
+        localStorage.setItem(key, JSON.stringify(list));
+      } catch (e) {}
+    }
 
     if (!isConfigured()) {
       const mockList = getMockBookings();
@@ -914,11 +927,12 @@
       };
       mockList.unshift(mockItem);
       saveMockBookings(mockList);
+      saveToClientLocalHistory(mockItem);
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('hairstudio:new-booking', { detail: mockItem }));
       }
-      return { success: true, booking: mockItem, isMock: true };
+      return { success: true, booking: mockItem, manage_token: manageToken, isMock: true };
     }
 
     // 1. Try secure RPC create_public_booking
@@ -940,7 +954,8 @@
           p_end_time: payload.end_time,
           p_service_names: payload.service_names,
           p_duration_min: payload.duration_min,
-          p_client_note: payload.client_note
+          p_client_note: payload.client_note,
+          p_manage_token: payload.manage_token
         })
       });
 
@@ -949,7 +964,8 @@
         if (data && data.success === false) {
           throw new Error(data.error || 'Ошибка при создании заявки');
         }
-        return { success: true, booking: payload, booking_id: data ? data.booking_id : null };
+        saveToClientLocalHistory(payload);
+        return { success: true, booking: payload, manage_token: manageToken, booking_id: data ? data.booking_id : null };
       }
     } catch (rpcErr) {
       if (rpcErr.message && !rpcErr.message.includes('HTTP')) {
@@ -975,7 +991,8 @@
         const errorText = await res.text();
         throw new Error(`Ошибка отправки заявки (${res.status}): ${errorText}`);
       }
-      return { success: true, booking: payload };
+      saveToClientLocalHistory(payload);
+      return { success: true, booking: payload, manage_token: manageToken };
     } catch (err) {
       console.error('Submit booking failed:', err);
       throw err;
@@ -1029,6 +1046,183 @@
       return { success: true };
     } catch (err) {
       console.error('updateBookingStatus error:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Client Self-Service: Get Booking by Manage Token
+   */
+  async function getBookingByManageToken(manageToken) {
+    if (!manageToken) return null;
+    const token = String(manageToken).trim();
+
+    // Check local client bookings store first (offline-first)
+    try {
+      const localStr = localStorage.getItem('sheber_client_bookings_v1');
+      if (localStr) {
+        const localList = JSON.parse(localStr);
+        const match = localList.find(b => b.manage_token === token);
+        if (match && !isConfigured()) return match;
+      }
+    } catch (e) {}
+
+    if (!isConfigured()) {
+      const mockList = getMockBookings();
+      const found = mockList.find(b => b.manage_token === token || b.id === token);
+      if (found) return found;
+      try {
+        const localStr = localStorage.getItem('sheber_client_bookings_v1');
+        if (localStr) {
+          const localList = JSON.parse(localStr);
+          return localList.find(b => b.manage_token === token) || null;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    try {
+      const endpoint = `${config.url}/rest/v1/booking_requests?manage_token=eq.${encodeURIComponent(token)}&select=*`;
+      const res = await fetch(endpoint, {
+        headers: {
+          'apikey': config.key,
+          'Authorization': `Bearer ${config.key}`
+        }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0) return list[0];
+
+      // Fallback: check local store
+      const localStr = localStorage.getItem('sheber_client_bookings_v1');
+      if (localStr) {
+        const localList = JSON.parse(localStr);
+        return localList.find(b => b.manage_token === token) || null;
+      }
+      return null;
+    } catch (e) {
+      console.warn('getBookingByManageToken error:', e);
+      try {
+        const localStr = localStorage.getItem('sheber_client_bookings_v1');
+        if (localStr) {
+          const localList = JSON.parse(localStr);
+          return localList.find(b => b.manage_token === token) || null;
+        }
+      } catch (err) {}
+      return null;
+    }
+  }
+
+  /**
+   * Client Self-Service: Cancel Booking by Manage Token
+   */
+  async function cancelBookingByManageToken(manageToken) {
+    if (!manageToken) throw new Error('Token is required');
+    const token = String(manageToken).trim();
+
+    // 1. Update local client bookings store
+    try {
+      const localStr = localStorage.getItem('sheber_client_bookings_v1');
+      if (localStr) {
+        const localList = JSON.parse(localStr);
+        const item = localList.find(b => b.manage_token === token);
+        if (item) {
+          item.status = 'cancelled';
+          item.updated_at = new Date().toISOString();
+          localStorage.setItem('sheber_client_bookings_v1', JSON.stringify(localList));
+        }
+      }
+    } catch (e) {}
+
+    if (!isConfigured()) {
+      const mockList = getMockBookings();
+      const item = mockList.find(b => b.manage_token === token || b.id === token);
+      if (item) {
+        item.status = 'cancelled';
+        saveMockBookings(mockList);
+      }
+      return { success: true };
+    }
+
+    try {
+      const endpoint = `${config.url}/rest/v1/booking_requests?manage_token=eq.${encodeURIComponent(token)}`;
+      const res = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'apikey': config.key,
+          'Authorization': `Bearer ${config.key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { success: true };
+    } catch (err) {
+      console.error('cancelBookingByManageToken error:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Client Self-Service: Reschedule Booking by Manage Token
+   */
+  async function rescheduleBookingByManageToken(manageToken, newDate, newStart, newEnd, durationMin) {
+    if (!manageToken || !newDate || !newStart) throw new Error('Missing reschedule parameters');
+    const token = String(manageToken).trim();
+    const end = newEnd || addMinutes(newStart, durationMin || 60);
+
+    // Update local client bookings store
+    try {
+      const localStr = localStorage.getItem('sheber_client_bookings_v1');
+      if (localStr) {
+        const localList = JSON.parse(localStr);
+        const item = localList.find(b => b.manage_token === token);
+        if (item) {
+          item.date = newDate;
+          item.start_time = newStart;
+          item.end_time = end;
+          if (durationMin) item.duration_min = durationMin;
+          item.status = 'pending';
+          item.updated_at = new Date().toISOString();
+          localStorage.setItem('sheber_client_bookings_v1', JSON.stringify(localList));
+        }
+      }
+    } catch (e) {}
+
+    if (!isConfigured()) {
+      const mockList = getMockBookings();
+      const item = mockList.find(b => b.manage_token === token || b.id === token);
+      if (item) {
+        item.date = newDate;
+        item.start_time = newStart;
+        item.end_time = end;
+        if (durationMin) item.duration_min = durationMin;
+        item.status = 'pending';
+        saveMockBookings(mockList);
+      }
+      return { success: true };
+    }
+
+    try {
+      const endpoint = `${config.url}/rest/v1/booking_requests?manage_token=eq.${encodeURIComponent(token)}`;
+      const res = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'apikey': config.key,
+          'Authorization': `Bearer ${config.key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          date: newDate,
+          start_time: newStart,
+          end_time: end,
+          status: 'pending'
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { success: true };
+    } catch (err) {
+      console.error('rescheduleBookingByManageToken error:', err);
       throw err;
     }
   }
@@ -1709,6 +1903,9 @@
     getServices,
     getBusySlots,
     submitBooking,
+    getBookingByManageToken,
+    cancelBookingByManageToken,
+    rescheduleBookingByManageToken,
     getPendingBookings,
     updateBookingStatus,
     syncMasterBusySlots,

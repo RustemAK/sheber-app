@@ -1,5 +1,5 @@
 // Sheber PWA Service Worker
-const CACHE_NAME = 'sheber-cache-v40';
+const CACHE_NAME = 'sheber-cache-v41';
 // NOTE: HTML references files with ?v= query strings for browser cache busting.
 // The fetch handler uses network-first and auto-updates the SW cache on success.
 const ASSETS_TO_CACHE = [

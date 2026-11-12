@@ -24,6 +24,8 @@ ALTER TABLE public.masters ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT N
 ALTER TABLE public.master_services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
 ALTER TABLE public.master_busy_slots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
 ALTER TABLE public.booking_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now());
+ALTER TABLE public.booking_requests ADD COLUMN IF NOT EXISTS manage_token TEXT UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_booking_requests_manage_token ON public.booking_requests(manage_token);
 
 -- Триггеры обновления updated_at
 DROP TRIGGER IF EXISTS trigger_masters_updated_at ON public.masters;
@@ -277,12 +279,14 @@ CREATE OR REPLACE FUNCTION public.create_public_booking(
     p_end_time TIME,
     p_service_names TEXT,
     p_duration_min INT DEFAULT 60,
-    p_client_note TEXT DEFAULT ''
+    p_client_note TEXT DEFAULT '',
+    p_manage_token TEXT DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
     v_master public.masters%ROWTYPE;
     v_booking_id UUID;
+    v_manage_token TEXT;
     v_is_sub_valid BOOLEAN := FALSE;
 BEGIN
     -- 1. Валидация мастера
@@ -324,6 +328,8 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Выбранное время уже занято, выберите другой слот');
     END IF;
 
+    v_manage_token := COALESCE(NULLIF(trim(p_manage_token), ''), 'sh_' || replace(gen_random_uuid()::text, '-', ''));
+
     -- 4. Создание брони
     INSERT INTO public.booking_requests (
         master_id,
@@ -335,7 +341,8 @@ BEGIN
         service_names,
         duration_min,
         client_note,
-        status
+        status,
+        manage_token
     ) VALUES (
         p_master_id,
         trim(p_client_name),
@@ -346,18 +353,163 @@ BEGIN
         trim(p_service_names),
         COALESCE(p_duration_min, 60),
         COALESCE(trim(p_client_note), ''),
-        'pending'
+        'pending',
+        v_manage_token
     ) RETURNING id INTO v_booking_id;
 
     RETURN jsonb_build_object(
         'success', true,
         'booking_id', v_booking_id,
+        'manage_token', v_manage_token,
         'message', 'Заявка успешно оформлена'
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-GRANT EXECUTE ON FUNCTION public.create_public_booking(UUID, TEXT, TEXT, DATE, TIME, TIME, TEXT, INT, TEXT) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.create_public_booking(UUID, TEXT, TEXT, DATE, TIME, TIME, TEXT, INT, TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- В) Получение информации о брони по персональному токену клиента (Self-Service)
+CREATE OR REPLACE FUNCTION public.get_booking_by_manage_token(p_manage_token TEXT)
+RETURNS JSONB AS $$
+DECLARE
+    v_booking RECORD;
+    v_master RECORD;
+BEGIN
+    IF p_manage_token IS NULL OR trim(p_manage_token) = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Токен управления не указан');
+    END IF;
+
+    SELECT b.id, b.master_id, b.client_name, b.date, b.start_time, b.end_time, 
+           b.service_names, b.duration_min, b.status, b.created_at, b.manage_token
+    INTO v_booking
+    FROM public.booking_requests b
+    WHERE b.manage_token = trim(p_manage_token)
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Запись не найдена');
+    END IF;
+
+    SELECT m.name AS master_name, m.salon_name, m.address, m.city, m.phone AS master_phone
+    INTO v_master
+    FROM public.masters m
+    WHERE m.id = v_booking.master_id
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'booking', jsonb_build_object(
+            'id', v_booking.id,
+            'master_id', v_booking.master_id,
+            'client_name', v_booking.client_name,
+            'date', v_booking.date,
+            'start_time', v_booking.start_time,
+            'end_time', v_booking.end_time,
+            'service_names', v_booking.service_names,
+            'duration_min', v_booking.duration_min,
+            'status', v_booking.status,
+            'manage_token', v_booking.manage_token,
+            'master_name', COALESCE(v_master.master_name, 'Мастер'),
+            'salon_name', COALESCE(v_master.salon_name, 'Sheber'),
+            'address', COALESCE(v_master.address, ''),
+            'city', COALESCE(v_master.city, '')
+        )
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.get_booking_by_manage_token(TEXT) TO anon, authenticated, service_role;
+
+-- Г) Отмена брони клиентом по токену управления (Self-Service)
+CREATE OR REPLACE FUNCTION public.cancel_booking_by_manage_token(p_manage_token TEXT)
+RETURNS JSONB AS $$
+DECLARE
+    v_id UUID;
+    v_status TEXT;
+BEGIN
+    IF p_manage_token IS NULL OR trim(p_manage_token) = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Токен управления не указан');
+    END IF;
+
+    SELECT id, status INTO v_id, v_status
+    FROM public.booking_requests
+    WHERE manage_token = trim(p_manage_token)
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Запись не найдена');
+    END IF;
+
+    IF v_status = 'cancelled' THEN
+        RETURN jsonb_build_object('success', true, 'message', 'Запись уже была отменена ранее');
+    END IF;
+
+    UPDATE public.booking_requests
+    SET status = 'cancelled', updated_at = timezone('utc'::text, now())
+    WHERE id = v_id;
+
+    RETURN jsonb_build_object('success', true, 'message', 'Запись успешно отменена');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.cancel_booking_by_manage_token(TEXT) TO anon, authenticated, service_role;
+
+-- Д) Перенос времени брони клиентом по токену управления (Self-Service)
+CREATE OR REPLACE FUNCTION public.reschedule_booking_by_manage_token(
+    p_manage_token TEXT,
+    p_new_date DATE,
+    p_new_start TIME,
+    p_new_end TIME,
+    p_duration_min INT DEFAULT 60
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_b public.booking_requests%ROWTYPE;
+BEGIN
+    IF p_manage_token IS NULL OR trim(p_manage_token) = '' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Токен управления не указан');
+    END IF;
+
+    SELECT * INTO v_b
+    FROM public.booking_requests
+    WHERE manage_token = trim(p_manage_token)
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Запись не найдена');
+    END IF;
+
+    -- Проверка наложения слота
+    IF EXISTS (
+        SELECT 1 FROM public.booking_requests b
+        WHERE b.master_id = v_b.master_id
+          AND b.date = p_new_date
+          AND b.id != v_b.id
+          AND b.status IN ('pending', 'confirmed')
+          AND (b.start_time, b.end_time) OVERLAPS (p_new_start, p_new_end)
+    ) OR EXISTS (
+        SELECT 1 FROM public.master_busy_slots s
+        WHERE s.master_id = v_b.master_id
+          AND s.date = p_new_date
+          AND (s.start_time, s.end_time) OVERLAPS (p_new_start, p_new_end)
+    ) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Выбранное время уже занято, выберите другой слот');
+    END IF;
+
+    UPDATE public.booking_requests
+    SET date = p_new_date,
+        start_time = p_new_start,
+        end_time = p_new_end,
+        duration_min = COALESCE(p_duration_min, v_b.duration_min),
+        status = 'pending',
+        updated_at = timezone('utc'::text, now())
+    WHERE id = v_b.id;
+
+    RETURN jsonb_build_object('success', true, 'message', 'Запись успешно перенесена на новую дату');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.reschedule_booking_by_manage_token(TEXT, DATE, TIME, TIME, INT) TO anon, authenticated, service_role;
 
 
 -- ==========================================================

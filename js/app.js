@@ -53,7 +53,13 @@ import {
   renderExpenses,
   openExpenseModal,
   handleExpenseSubmit,
-  handleExpenseDelete
+  handleExpenseDelete,
+  setupMaterialsSubTabs,
+  renderInventory,
+  openInventoryModal,
+  handleInventorySubmit,
+  handleInventoryDelete,
+  exportTaxReportCSV
 } from './finance.js';
 import {
   renderSubscriptionStatus,
@@ -1008,7 +1014,89 @@ export function loadOnlineBookingSettings() {
   setVal('settingMaster2gis', gis);
   setVal('settingMasterInstagram', insta);
 
+  renderWeeklyScheduleEditor();
   updateBookingLinkDisplay();
+}
+
+export function renderWeeklyScheduleEditor() {
+  const container = document.getElementById('weeklyScheduleEditor');
+  if (!container) return;
+
+  const daysDef = [
+    { num: 1, name: 'Пн (Понедельник)' },
+    { num: 2, name: 'Вт (Вторник)' },
+    { num: 3, name: 'Ср (Среда)' },
+    { num: 4, name: 'Чт (Четверг)' },
+    { num: 5, name: 'Пт (Пятница)' },
+    { num: 6, name: 'Сб (Суббота)' },
+    { num: 0, name: 'Вс (Воскресенье)' }
+  ];
+
+  container.innerHTML = daysDef.map(d => {
+    const cfg = (state.weeklySchedule && state.weeklySchedule[d.num]) || { enabled: d.num !== 0, start: '09:00', end: '20:00' };
+    const isChecked = cfg.enabled !== false;
+
+    return `
+      <div class="weekly-day-row ${isChecked ? '' : 'is-disabled'}" data-day="${d.num}">
+        <label class="weekly-day-toggle">
+          <input type="checkbox" class="weekly-day-checkbox" data-day="${d.num}" ${isChecked ? 'checked' : ''}>
+          <span>${d.name}</span>
+        </label>
+        <div class="weekly-day-times">
+          <input type="time" class="weekly-time-input weekly-start-time" data-day="${d.num}" value="${cfg.start || '09:00'}" ${isChecked ? '' : 'disabled'}>
+          <span style="color: var(--text-muted); font-size: 11px;">–</span>
+          <input type="time" class="weekly-time-input weekly-end-time" data-day="${d.num}" value="${cfg.end || '20:00'}" ${isChecked ? '' : 'disabled'}>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.weekly-day-checkbox').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const day = e.target.dataset.day;
+      const row = container.querySelector(`.weekly-day-row[data-day="${day}"]`);
+      const isEnabled = e.target.checked;
+      if (row) {
+        row.classList.toggle('is-disabled', !isEnabled);
+        row.querySelectorAll('.weekly-time-input').forEach(inp => inp.disabled = !isEnabled);
+      }
+      saveWeeklyScheduleFromUI();
+    });
+  });
+
+  container.querySelectorAll('.weekly-time-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      saveWeeklyScheduleFromUI();
+    });
+  });
+}
+
+function saveWeeklyScheduleFromUI() {
+  const container = document.getElementById('weeklyScheduleEditor');
+  if (!container) return;
+
+  const schedule = {};
+  container.querySelectorAll('.weekly-day-row').forEach(row => {
+    const day = row.dataset.day;
+    const cb = row.querySelector('.weekly-day-checkbox');
+    const startInput = row.querySelector('.weekly-start-time');
+    const endInput = row.querySelector('.weekly-end-time');
+
+    schedule[day] = {
+      enabled: cb ? cb.checked : true,
+      start: startInput ? startInput.value : '09:00',
+      end: endInput ? endInput.value : '20:00'
+    };
+  });
+
+  state.weeklySchedule = schedule;
+  safeStorage.set('hairstudio_weekly_schedule', JSON.stringify(schedule));
+
+  if (state.currentMaster && window.HairSupabase) {
+    window.HairSupabase.updateMasterProfile(state.currentMaster.id, {
+      working_hours: schedule
+    }).catch(err => console.warn('Sync working_hours failed:', err));
+  }
 }
 
 export async function handleSaveOnlineBookingSettings() {
@@ -1684,6 +1772,15 @@ export function restoreSavedPreferences() {
   const savedWorkEnd = localStorage.getItem('hairstudio_work_end_hour');
   state.workEndHour = savedWorkEnd !== null ? parseInt(savedWorkEnd, 10) : 22;
 
+  const savedWeekly = safeStorage.get('hairstudio_weekly_schedule');
+  if (savedWeekly) {
+    try { state.weeklySchedule = JSON.parse(savedWeekly); } catch (e) {}
+  }
+  const savedOverrides = safeStorage.get('hairstudio_day_overrides');
+  if (savedOverrides) {
+    try { state.dayOverrides = JSON.parse(savedOverrides); } catch (e) {}
+  }
+
   populateWorkHourSelects();
 }
 
@@ -1913,7 +2010,10 @@ export function switchTab(tabId, shouldScroll = true) {
   if (tabId === 'schedule') renderSchedule();
   else if (tabId === 'clients') renderClients();
   else if (tabId === 'services') renderServices();
-  else if (tabId === 'expenses') renderExpenses();
+  else if (tabId === 'expenses') {
+    renderExpenses();
+    renderInventory();
+  }
   else if (tabId === 'finance') renderFinance();
 
   if (shouldScroll) {
@@ -1976,17 +2076,19 @@ function restoreActiveTabAndScroll() {
 
 // ================= DATA LOADING =================
 export async function reloadData() {
-  const [services, appointments, expenses, clients] = await Promise.all([
+  const [services, appointments, expenses, clients, inventory] = await Promise.all([
     window.db.getServices(),
     window.db.getAppointments(),
     window.db.getExpenses(),
-    window.db.getClients()
+    window.db.getClients(),
+    (window.db && window.db.getInventory) ? window.db.getInventory() : Promise.resolve([])
   ]);
 
   state.services = services || [];
   state.appointments = appointments || [];
   state.expenses = expenses || [];
   state.clients = clients || [];
+  state.inventory = inventory || [];
 
   rebuildIndices();
 
@@ -2001,6 +2103,7 @@ export async function reloadData() {
     renderServices();
   } else if (state.activeTab === 'expenses') {
     renderExpenses();
+    renderInventory();
   } else if (state.activeTab === 'finance') {
     renderFinance();
   } else {
@@ -2172,7 +2275,12 @@ function setupEventListeners() {
       if (state.activeTab === 'services') {
         openServiceModal();
       } else if (state.activeTab === 'expenses') {
-        openExpenseModal();
+        const invSection = document.getElementById('materialsInventorySection');
+        if (invSection && invSection.style.display !== 'none') {
+          openInventoryModal();
+        } else {
+          openExpenseModal();
+        }
       } else {
         openAppointmentModal();
       }
@@ -2207,6 +2315,15 @@ function setupEventListeners() {
 
   const btnDelExp = document.getElementById('btnDeleteExpense');
   if (btnDelExp) btnDelExp.addEventListener('click', () => handleExpenseDelete(reloadData));
+
+  // Materials & Warehouse Inventory (Module 4)
+  setupMaterialsSubTabs();
+
+  const formInv = document.getElementById('formInventoryItem');
+  if (formInv) formInv.addEventListener('submit', (e) => handleInventorySubmit(e, reloadData));
+
+  const btnDelInv = document.getElementById('btnDeleteInventoryItem');
+  if (btnDelInv) btnDelInv.addEventListener('click', () => handleInventoryDelete(reloadData));
 
   const btnSaveNotes = document.getElementById('btnSaveClientNotes');
   if (btnSaveNotes) btnSaveNotes.addEventListener('click', () => handleSaveClientNotes(reloadData));
@@ -2543,6 +2660,7 @@ function initApp() {
       setupDateStrip();
       setupServiceWorker();
       restoreActiveTabAndScroll();
+      handleUrlActionShortcuts();
 
       if (state.currentMaster && state.currentMaster.id) {
         checkAndRestoreCloudData(state.currentMaster.id).catch(console.warn);
@@ -2576,6 +2694,34 @@ function initApp() {
   });
 }
 
+/**
+ * Module 7: Handle PWA shortcuts (?action=...)
+ */
+function handleUrlActionShortcuts() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+    if (!action) return;
+
+    if (action === 'new_appointment') {
+      switchTab('schedule', false);
+      openAppointmentModal();
+    } else if (action === 'new_expense') {
+      switchTab('expenses', false);
+      openExpenseModal();
+    } else if (action === 'schedule') {
+      switchTab('schedule', false);
+    }
+
+    urlParams.delete('action');
+    const newSearch = urlParams.toString();
+    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+    window.history.replaceState(null, '', newUrl);
+  } catch (e) {
+    console.warn('handleUrlActionShortcuts error:', e);
+  }
+}
+
 // Global debug exposure
 window.app = {
   state,
@@ -2586,8 +2732,10 @@ window.app = {
   openAppointmentModal,
   openServiceModal,
   openExpenseModal,
+  openInventoryModal,
   openClientDetailsModal,
   openKaspiPayModal,
+  exportTaxReportCSV,
   handleCreateTestMaster,
   handleFillTestMasterForm,
   handleSignIn,
@@ -2597,11 +2745,14 @@ window.app = {
   showRecoveryNewPasswordForm
 };
 
+window.reloadData = reloadData;
 window.openAppointmentModal = openAppointmentModal;
 window.openServiceModal = openServiceModal;
 window.openExpenseModal = openExpenseModal;
+window.openInventoryModal = openInventoryModal;
 window.openClientDetailsModal = openClientDetailsModal;
 window.openKaspiPayModal = openKaspiPayModal;
+window.exportTaxReportCSV = exportTaxReportCSV;
 window.handleCreateTestMaster = handleCreateTestMaster;
 window.handleFillTestMasterForm = handleFillTestMasterForm;
 window.handleSignIn = handleSignIn;

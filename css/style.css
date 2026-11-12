@@ -726,6 +726,68 @@ body {
 .appointment-card.status-scheduled::before { background: var(--accent-gold); }
 .appointment-card.status-completed::before { background: var(--status-completed); }
 .appointment-card.status-cancelled::before { background: var(--status-cancelled); }
+.appointment-card.is-break::before { background: #94a3b8 !important; }
+
+/* Break / Lunch slot styling */
+.appointment-card.is-break {
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  box-shadow: none;
+}
+.appointment-card.is-break .client-name,
+.appointment-card.is-break .compact-client-name {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+/* Day Off styling */
+.date-card.is-day-off {
+  opacity: 0.65;
+  border-style: dashed !important;
+}
+.date-card.is-day-off .day-name::after {
+  content: ' • отд';
+  font-size: 8px;
+  color: #f87171;
+}
+
+/* Weekly Schedule Editor */
+.weekly-day-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+.weekly-day-row.is-disabled {
+  opacity: 0.5;
+  background: transparent;
+}
+.weekly-day-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.weekly-day-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.weekly-time-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  font-size: 12px;
+}
 
 .card-top {
   display: flex;
@@ -2600,4 +2662,158 @@ input[type="number"] {
 .btn-booking-reject:active {
   transform: scale(0.97);
 }
+
+/* ================= MODULE 4: INVENTORY WAREHOUSE ================= */
+.inventory-item-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s ease;
+}
+.inventory-item-card.is-low-stock {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.05);
+}
+.inventory-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.inventory-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inventory-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.inventory-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.inventory-stock-badge.low {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.inventory-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.inventory-quick-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.inventory-quick-btn:active {
+  transform: scale(0.95);
+}
+
+/* ================= MODULE 5: PHOTO GALLERY (BEFORE / AFTER) ================= */
+.visit-photos-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin: 12px 0;
+}
+.visit-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.photo-slot {
+  aspect-ratio: 1;
+  background: var(--bg-input);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+.photo-slot:hover {
+  border-color: var(--accent-gold);
+}
+.photo-slot.has-image {
+  border-style: solid;
+}
+.photo-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-slot-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+.photo-slot-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+.photo-slot-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(239, 68, 68, 0.85);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  border: none;
+}
+
 

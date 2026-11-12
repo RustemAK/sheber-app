@@ -1,13 +1,186 @@
 /**
- * HairStudio PWA - Public Client Booking Controller
+ * HairStudio / Sheber PWA - Public Client Booking & Self-Service Controller
  * File: js/book.js
- * Handles master profile display, service selection, slot calculation and booking submission.
+ * Multi-language (KZ/RU) + Client Self-Service (Cancel/Reschedule via personal link)
  */
 
 (function () {
   'use strict';
 
+  // I18N Translations Dictionary
+  const I18N = {
+    ru: {
+      titlePrefix: 'Запись к',
+      titleSuffix: 'Sheber',
+      waChat: 'Чат WhatsApp',
+      route2Gis: '2ГИС (Маршрут)',
+      step1: '1. Выберите услуги',
+      step2: '2. Дата и свободное время',
+      step3: '3. Ваши контакты',
+      nameLabel: 'Ваше имя *',
+      namePlaceholder: 'Как к вам обращаться?',
+      phoneLabel: 'Номер WhatsApp *',
+      noteLabel: 'Пожелание или комментарий (необязательно)',
+      notePlaceholder: 'Особые пожелания к визиту, длина волос и т.д.',
+      submitBtn: 'Записаться',
+      submitting: 'Отправка заявки...',
+      submitted: 'Заявка отправлена ✓',
+      submitError: 'Ошибка при отправке заявки: ',
+      submitFail: 'Не удалось отправить заявку. Попробуйте еще раз или напишите мастеру в WhatsApp напрямую.',
+      selectTime: 'Выберите время',
+      noServicesSelected: 'Услуги не выбраны',
+      selectedCount: 'Выбрано',
+      serviceOne: 'услуга',
+      serviceFew: 'услуги',
+      serviceMany: 'услуг',
+      noServicesInCategory: 'В этой категории нет доступных услуг',
+      firstSelectService: 'Сначала выберите хотя бы одну услугу выше ☝️',
+      calculatingSlots: 'Расчет свободных окон...',
+      noSlotsDay: 'На этот день все места заняты или мастер отдыхает. Пожалуйста, выберите другую дату выше 📅',
+      periodMorning: '🌅 Утро',
+      periodAfternoon: '☀️ День',
+      periodEvening: '🌙 Вечер',
+      hourShort: 'ч',
+      minShort: 'мин',
+      today: 'Сегодня',
+      tomorrow: 'Завтра',
+      monthsShort: ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'],
+      monthsFull: ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'],
+      daysShort: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+      cats: {
+        all: 'Все',
+        haircut: 'Стрижки',
+        coloring: 'Окрашивание',
+        care: 'Уход',
+        styling: 'Стилизация',
+        other: 'Другое'
+      },
+      successTitle: 'Заявка отправлена!',
+      successText: 'Мастер проверит свой рабочий график и подтвердит вашу запись сообщением в WhatsApp.',
+      successDate: 'Дата:',
+      successTime: 'Время:',
+      successServices: 'Услуги:',
+      successMaster: 'Мастер:',
+      successAddress: 'Адрес:',
+      successWhatsappBtn: 'Написать мастеру в WhatsApp',
+      successCloseBtn: 'Закрыть',
+      manageLinkTitle: '🔑 Персональная ссылка для управления',
+      manageLinkDesc: 'Сохраните эту ссылку, чтобы при необходимости самостоятельно отменить или перенести запись без звонков мастеру:',
+      copyBtn: 'Копировать',
+      copiedBtn: 'Скопировано!',
+      btnManageSelf: 'Открыть страницу управления записью',
+      // Self-service screen
+      manageTitle: '📱 Управление записью',
+      statusPending: 'Ожидает подтверждения',
+      statusConfirmed: 'Подтверждена',
+      statusCancelled: 'Отменена',
+      statusCompleted: 'Завершена',
+      manageServices: 'Услуги:',
+      manageDate: 'Дата:',
+      manageTime: 'Время:',
+      manageClient: 'Клиент:',
+      manageMaster: 'Мастер:',
+      btnReschedule: 'Перенести на другое время',
+      btnCancel: 'Отменить запись',
+      btnMakeNewBooking: 'Записаться снова',
+      confirmCancelPrompt: 'Вы уверены, что хотите отменить эту запись? Слот мастера моментально освободится.',
+      cancelSuccess: 'Запись успешно отменена.',
+      chooseNewTime: '🔄 Выберите новую дату и время',
+      btnConfirmNewTime: 'Подтвердить перенос',
+      btnCancelReschedule: 'Назад',
+      rescheduleSuccess: 'Запись успешно перенесена на новое время!',
+      manageNotFound: 'Запись по указанной ссылке не найдена или устарела.',
+      cancelling: 'Отмена...'
+    },
+    kk: {
+      titlePrefix: 'Жазылу —',
+      titleSuffix: 'Sheber',
+      waChat: 'WhatsApp чаты',
+      route2Gis: '2ГИС (Маршрут)',
+      step1: '1. Қызметтерді таңдаңыз',
+      step2: '2. Күні мен бос уақытты таңдаңыз',
+      step3: '3. Байланыс деректеріңіз',
+      nameLabel: 'Атыңыз *',
+      namePlaceholder: 'Сізге қалай жүгінуге болады?',
+      phoneLabel: 'Телефон нөмірі (WhatsApp) *',
+      noteLabel: 'Қосымша тілек немесе сұрақ (міндетті емес)',
+      notePlaceholder: 'Қосымша тілектеріңіз, шаш ұзындығы т.б.',
+      submitBtn: 'Жазылу',
+      submitting: 'Өтініш жіберілуде...',
+      submitted: 'Өтініш жіберілді ✓',
+      submitError: 'Өтінішті жіберу кезіндегі қате: ',
+      submitFail: 'Өтініш жіберілмеді. Қайталап көріңіз немесе шеберге WhatsApp арқылы тікелей жазыңыз.',
+      selectTime: 'Уақытты таңдаңыз',
+      noServicesSelected: 'Қызметтер таңдалмаған',
+      selectedCount: 'Таңдалды',
+      serviceOne: 'қызмет',
+      serviceFew: 'қызмет',
+      serviceMany: 'қызмет',
+      noServicesInCategory: 'Бұл санатта қолжетімді қызметтер жоқ',
+      firstSelectService: 'Алдымен жоғарыдан кемінде бір қызметті таңдаңыз ☝️',
+      calculatingSlots: 'Бос уақытты есептеу...',
+      noSlotsDay: 'Бұл күні барлық орындар бос емес немесе шебер демалуда. Жоғарыдан басқа күнді таңдаңыз 📅',
+      periodMorning: '🌅 Таңертең',
+      periodAfternoon: '☀️ Түс',
+      periodEvening: '🌙 Кеш',
+      hourShort: 'сағ',
+      minShort: 'мин',
+      today: 'Бүгін',
+      tomorrow: 'Ертең',
+      monthsShort: ['қаң', 'ақп', 'нау', 'сәу', 'мам', 'мау', 'шіл', 'там', 'қыр', 'қаз', 'қар', 'жел'],
+      monthsFull: ['қаңтар', 'ақпан', 'наурыз', 'сәуір', 'мамыр', 'маусым', 'шілде', 'тамыз', 'қыркүйек', 'қазан', 'қараша', 'желтоқсан'],
+      daysShort: ['Жс', 'Дс', 'Сс', 'Ср', 'Бс', 'Жм', 'Сб'],
+      cats: {
+        all: 'Барлығы',
+        haircut: 'Шаш қию',
+        coloring: 'Бояу',
+        care: 'Күтім',
+        styling: 'Сәндеу',
+        other: 'Басқа'
+      },
+      successTitle: 'Өтініш жіберілді!',
+      successText: 'Шебер өз жұмыс кестесін тексеріп, жазылуыңызды WhatsApp арқылы растайды.',
+      successDate: 'Күні:',
+      successTime: 'Уақыты:',
+      successServices: 'Қызметтер:',
+      successMaster: 'Шебер:',
+      successAddress: 'Мекенжайы:',
+      successWhatsappBtn: 'Шеберге WhatsApp-қа жазу',
+      successCloseBtn: 'Жабу',
+      manageLinkTitle: '🔑 Басқаруға арналған жеке сілтеме',
+      manageLinkDesc: 'Қажет болса, шеберге қоңырау шалмай-ақ жазылуды өз бетіңізше бас тарту немесе ауыстыру үшін осы сілтемені сақтап алыңыз:',
+      copyBtn: 'Көшіру',
+      copiedBtn: 'Көшірілді!',
+      btnManageSelf: 'Жазылуды басқару бетін ашу',
+      // Self-service screen
+      manageTitle: '📱 Жазылуды басқару',
+      statusPending: 'Растауды күтуде',
+      statusConfirmed: 'Расталды',
+      statusCancelled: 'Бас тартылды',
+      statusCompleted: 'Аяқталды',
+      manageServices: 'Қызметтер:',
+      manageDate: 'Күні:',
+      manageTime: 'Уақыты:',
+      manageClient: 'Клиент:',
+      manageMaster: 'Шебер:',
+      btnReschedule: 'Басқа уақытқа ауыстыру',
+      btnCancel: 'Жазылудан бас тарту',
+      btnMakeNewBooking: 'Қайта жазылу',
+      confirmCancelPrompt: 'Бұл жазылудан бас тартқыңыз келетініне сенімдісіз бе? Шебердің уақыт терезесі бірден босайды.',
+      cancelSuccess: 'Жазылудан сәтті бас тартылды.',
+      chooseNewTime: '🔄 Жаңа күн мен уақытты таңдаңыз',
+      btnConfirmNewTime: 'Ауыстыруды растау',
+      btnCancelReschedule: 'Артқа',
+      rescheduleSuccess: 'Жазылу жаңа уақытқа сәтті ауыстырылды!',
+      manageNotFound: 'Көрсетілген сілтеме бойынша жазылу табылмады немесе мерзімі өткен.',
+      cancelling: 'Бас тартылуда...'
+    }
+  };
+
   // State
+  let currentLang = localStorage.getItem('sheber_lang') || (navigator.language && navigator.language.startsWith('kk') ? 'kk' : 'ru');
+  if (currentLang !== 'kk' && currentLang !== 'ru') currentLang = 'ru';
+
   const bookingState = {
     master: null,
     services: [],
@@ -15,12 +188,17 @@
     selectedDate: '',
     selectedSlot: null,
     busySlots: [],
-    activeCategory: 'all'
+    activeCategory: 'all',
+    // Manage state
+    manageBooking: null,
+    manageNewDate: '',
+    manageNewSlot: null
   };
 
-  const RU_MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-  const RU_DAYS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-  const RU_MONTHS_FULL = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  function t(key) {
+    const dict = I18N[currentLang] || I18N.ru;
+    return dict[key] || I18N.ru[key] || key;
+  }
 
   function escapeHtml(str) {
     if (!str) return '';
@@ -42,7 +220,8 @@
   function formatDisplayFullDate(ymd) {
     if (!ymd) return '';
     const [y, m, d] = ymd.split('-').map(Number);
-    return `${d} ${RU_MONTHS_FULL[m - 1]} ${y}`;
+    const months = (I18N[currentLang] || I18N.ru).monthsFull;
+    return `${d} ${months[m - 1]} ${y}`;
   }
 
   function addMinutesToTime(timeStr, mins) {
@@ -60,11 +239,153 @@
 
   // Initialize
   document.addEventListener('DOMContentLoaded', async () => {
+    setupLanguageSwitcher();
     setupPhoneMask();
     setupCategoryFilters();
     setupFormListeners();
+    applyLanguage(currentLang);
     await loadMasterData();
   });
+
+  // Language switcher setup
+  function setupLanguageSwitcher() {
+    const switchContainer = document.getElementById('langSwitch');
+    if (!switchContainer) return;
+
+    switchContainer.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lang = btn.getAttribute('data-lang');
+        if (lang && lang !== currentLang) {
+          currentLang = lang;
+          try {
+            localStorage.setItem('sheber_lang', lang);
+          } catch (e) {}
+          applyLanguage(lang);
+        }
+      });
+    });
+  }
+
+  function applyLanguage(lang) {
+    currentLang = lang;
+    const dict = I18N[lang] || I18N.ru;
+
+    // Update switcher buttons UI
+    document.querySelectorAll('#langSwitch .lang-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+    });
+
+    // Header contacts
+    const elWa = document.getElementById('labelWhatsappChat');
+    if (elWa) elWa.innerText = dict.waChat;
+    const el2Gis = document.getElementById('label2GisRoute');
+    if (el2Gis) el2Gis.innerText = dict.route2Gis;
+
+    // Step titles
+    const s1 = document.getElementById('labelStepServices');
+    if (s1) s1.innerText = dict.step1;
+    const s2 = document.getElementById('labelStepDateTime');
+    if (s2) s2.innerText = dict.step2;
+    const s3 = document.getElementById('labelStepContacts');
+    if (s3) s3.innerText = dict.step3;
+
+    // Form inputs
+    const lName = document.getElementById('labelClientName');
+    if (lName) lName.innerText = dict.nameLabel;
+    const inName = document.getElementById('clientNameInput');
+    if (inName) inName.placeholder = dict.namePlaceholder;
+
+    const lPhone = document.getElementById('labelClientPhone');
+    if (lPhone) lPhone.innerText = dict.phoneLabel;
+
+    const lNote = document.getElementById('labelClientNote');
+    if (lNote) lNote.innerText = dict.noteLabel;
+    const inNote = document.getElementById('clientNoteInput');
+    if (inNote) inNote.placeholder = dict.notePlaceholder;
+
+    // Submit button
+    const btnSub = document.getElementById('labelBtnSubmit');
+    if (btnSub) btnSub.innerText = dict.submitBtn;
+
+    // Category chips
+    document.querySelectorAll('#serviceCategoryChips .chip-btn').forEach(btn => {
+      const catKey = btn.getAttribute('data-category');
+      const label = dict.cats[catKey] || catKey;
+      const span = btn.querySelector('.cat-label') || btn;
+      span.innerText = label;
+    });
+
+    // Success modal elements
+    const st = document.getElementById('labelSuccessTitle');
+    if (st) st.innerText = dict.successTitle;
+    const sText = document.getElementById('labelSuccessText');
+    if (sText) sText.innerText = dict.successText;
+    const sd = document.getElementById('labelSuccessDate');
+    if (sd) sd.innerText = dict.successDate;
+    const stm = document.getElementById('labelSuccessTime');
+    if (stm) stm.innerText = dict.successTime;
+    const ss = document.getElementById('labelSuccessServices');
+    if (ss) ss.innerText = dict.successServices;
+    const sm = document.getElementById('labelSuccessMaster');
+    if (sm) sm.innerText = dict.successMaster;
+    const sa = document.getElementById('labelSuccessAddress');
+    if (sa) sa.innerText = dict.successAddress;
+    const sw = document.getElementById('labelSuccessWhatsappBtn');
+    if (sw) sw.innerText = dict.successWhatsappBtn;
+    const sc = document.getElementById('labelSuccessCloseBtn');
+    if (sc) sc.innerText = dict.successCloseBtn;
+
+    // Manage link box in success modal
+    const mlTitle = document.getElementById('labelManageLinkTitle');
+    if (mlTitle) mlTitle.innerText = dict.manageLinkTitle;
+    const mlDesc = document.getElementById('labelManageLinkDesc');
+    if (mlDesc) mlDesc.innerText = dict.manageLinkDesc;
+    const cBtn = document.getElementById('labelCopyBtn');
+    if (cBtn) cBtn.innerText = dict.copyBtn;
+    const msBtn = document.getElementById('labelBtnManageSelf');
+    if (msBtn) msBtn.innerText = dict.btnManageSelf;
+
+    // Manage screen elements
+    const mTitle = document.getElementById('labelManageTitle');
+    if (mTitle) mTitle.innerText = dict.manageTitle;
+    const mServ = document.getElementById('labelManageServices');
+    if (mServ) mServ.innerText = dict.manageServices;
+    const mDate = document.getElementById('labelManageDate');
+    if (mDate) mDate.innerText = dict.manageDate;
+    const mTime = document.getElementById('labelManageTime');
+    if (mTime) mTime.innerText = dict.manageTime;
+    const mCli = document.getElementById('labelManageClient');
+    if (mCli) mCli.innerText = dict.manageClient;
+    const mMast = document.getElementById('labelManageMaster');
+    if (mMast) mMast.innerText = dict.manageMaster;
+
+    const bResched = document.getElementById('labelBtnReschedule');
+    if (bResched) bResched.innerText = dict.btnReschedule;
+    const bCancel = document.getElementById('labelBtnCancel');
+    if (bCancel) bCancel.innerText = dict.btnCancel;
+    const bNew = document.getElementById('labelBtnMakeNewBooking');
+    if (bNew) bNew.innerText = dict.btnMakeNewBooking;
+
+    const cnt = document.getElementById('labelChooseNewTime');
+    if (cnt) cnt.innerText = dict.chooseNewTime;
+    const bcn = document.getElementById('labelBtnConfirmNewTime');
+    if (bcn) bcn.innerText = dict.btnConfirmNewTime;
+    const bcr = document.getElementById('labelBtnCancelReschedule');
+    if (bcr) bcr.innerText = dict.btnCancelReschedule;
+
+    // Refresh dynamic parts
+    if (bookingState.master) {
+      document.title = `${dict.titlePrefix} ${bookingState.master.name || 'Sheber'} — ${dict.titleSuffix}`;
+    }
+    renderServices();
+    updateDurationSummary();
+    if (bookingState.selectedDate) {
+      initDateStrip(bookingState.selectedDate);
+    }
+    if (bookingState.manageBooking) {
+      updateManageStatusBadge(bookingState.manageBooking.status);
+    }
+  }
 
   // Phone mask for Kazakhstan (+7 (7XX) XXX-XX-XX)
   function setupPhoneMask() {
@@ -133,7 +454,8 @@
         let cleanPhone = master.phone.replace(/\D/g, '');
         if (cleanPhone.length === 11 && cleanPhone.startsWith('8')) cleanPhone = '7' + cleanPhone.slice(1);
         else if (cleanPhone.length === 10 && !cleanPhone.startsWith('7')) cleanPhone = '7' + cleanPhone;
-        waLink.href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent('Здравствуйте! Хочу записаться к вам на приём')}`;
+        const msg = currentLang === 'kk' ? 'Сәлеметсіз бе! Сізге жазылғым келеді' : 'Здравствуйте! Хочу записаться к вам на приём';
+        waLink.href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
       }
     }
   }
@@ -141,15 +463,23 @@
   async function loadMasterData() {
     const urlParams = new URLSearchParams(window.location.search);
     const slug = urlParams.get('m') || 'demo';
+    const manageToken = (urlParams.get('manage') || '').trim();
 
     try {
       const master = await window.HairSupabase.getMaster(slug);
       if (!master) {
-        document.getElementById('masterName').innerText = 'Мастер не найден';
+        document.getElementById('masterName').innerText = currentLang === 'kk' ? 'Шебер табылмады' : 'Мастер не найден';
         return;
       }
+
       bookingState.master = master;
       renderMasterProfile(master);
+
+      // Check if Client Self-Service Manage Mode (?manage=TOKEN)
+      if (manageToken) {
+        await initClientManageView(manageToken);
+        return;
+      }
 
       if (!isMasterBookingActive(master)) {
         showInactiveBooking(master);
@@ -163,7 +493,7 @@
       initDateStrip();
     } catch (err) {
       console.error('Error loading master data:', err);
-      document.getElementById('masterName').innerText = 'Мастер временно недоступен';
+      document.getElementById('masterName').innerText = currentLang === 'kk' ? 'Шебер уақытша қолжетімсіз' : 'Мастер временно недоступен';
     }
   }
 
@@ -182,12 +512,12 @@
         addressText = `${city}, ${addr}`.trim().replace(/^,\s*/, '');
       }
     } else {
-      addressText = city || addr || 'Город уточняйте у мастера';
+      addressText = city || addr || (currentLang === 'kk' ? 'Қаланы шеберден нақтылаңыз' : 'Город уточняйте у мастера');
     }
     document.getElementById('masterAddress').innerText = addressText;
-    document.title = `Запись к ${master.name || 'мастеру'} — ${master.salon_name || 'Sheber'}`;
+    document.title = `${t('titlePrefix')} ${master.name || 'Sheber'} — ${t('titleSuffix')}`;
 
-    // 2GIS link (custom direct URL or automatic search query)
+    // 2GIS link
     let customGis = (master.gis_url && master.gis_url.startsWith('http')) ? master.gis_url : '';
     if (!customGis && master.subscription_notes) {
       try {
@@ -212,7 +542,8 @@
     }
     const waLink = document.getElementById('linkMasterWhatsapp');
     if (waLink) {
-      waLink.href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent('Здравствуйте! Я по поводу онлайн-записи')}`;
+      const msg = currentLang === 'kk' ? 'Сәлеметсіз бе! Мен онлайн-жазылу бойынша' : 'Здравствуйте! Я по поводу онлайн-записи';
+      waLink.href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
     }
 
     // Instagram link
@@ -250,15 +581,18 @@
     });
 
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="no-slots-alert">В этой категории нет доступных услуг</div>';
+      container.innerHTML = `<div class="no-slots-alert">${t('noServicesInCategory')}</div>`;
       return;
     }
+
+    const hShort = t('hourShort');
+    const mShort = t('minShort');
 
     container.innerHTML = filtered.map(s => {
       const isSelected = bookingState.selectedServiceIds.has(s.id);
       const dur = s.duration_min >= 60 
-        ? `${Math.floor(s.duration_min / 60)} ч ${s.duration_min % 60 ? (s.duration_min % 60) + ' мин' : ''}`.trim()
-        : `${s.duration_min} мин`;
+        ? `${Math.floor(s.duration_min / 60)} ${hShort} ${s.duration_min % 60 ? (s.duration_min % 60) + ' ' + mShort : ''}`.trim()
+        : `${s.duration_min} ${mShort}`;
 
       return `
         <div class="service-item ${isSelected ? 'selected' : ''}" data-service-id="${escapeHtml(s.id)}">
@@ -291,7 +625,7 @@
   function onServicesSelectionChanged() {
     bookingState.selectedSlot = null;
     const timeLabel = document.getElementById('barSelectedTimeLabel');
-    if (timeLabel) timeLabel.innerText = 'Выберите время';
+    if (timeLabel) timeLabel.innerText = t('selectTime');
     renderServices();
     updateDurationSummary();
     if (bookingState.selectedDate) {
@@ -312,51 +646,79 @@
   function updateDurationSummary() {
     const count = bookingState.selectedServiceIds.size;
     const countBadge = document.getElementById('selectedCountBadge');
-    if (countBadge) countBadge.innerText = `Выбрано: ${count}`;
+    if (countBadge) countBadge.innerText = `${t('selectedCount')}: ${count}`;
 
     const summaryBox = document.getElementById('durationSummary');
     const durationText = document.getElementById('totalDurationText');
     const barServices = document.getElementById('barSelectedServicesLabel');
 
+    const hShort = t('hourShort');
+    const mShort = t('minShort');
+
     if (count > 0) {
       if (summaryBox) summaryBox.style.display = 'flex';
       const totalMin = getTotalSelectedDuration();
       const durStr = totalMin >= 60
-        ? `${Math.floor(totalMin / 60)} ч ${totalMin % 60 ? (totalMin % 60) + ' мин' : ''}`.trim()
-        : `${totalMin} мин`;
+        ? `${Math.floor(totalMin / 60)} ${hShort} ${totalMin % 60 ? (totalMin % 60) + ' ' + mShort : ''}`.trim()
+        : `${totalMin} ${mShort}`;
       if (durationText) durationText.innerText = durStr;
-      if (barServices) barServices.innerText = `${count} ${count === 1 ? 'услуга' : (count < 5 ? 'услуги' : 'услуг')} (~${durStr})`;
+      if (barServices) {
+        let word = t('serviceMany');
+        if (count === 1) word = t('serviceOne');
+        else if (count < 5) word = t('serviceFew');
+        barServices.innerText = `${count} ${word} (~${durStr})`;
+      }
     } else {
       if (summaryBox) summaryBox.style.display = 'none';
-      if (barServices) barServices.innerText = 'Услуги не выбраны';
+      if (barServices) barServices.innerText = t('noServicesSelected');
     }
   }
 
-  function initDateStrip() {
+  function isMasterDayOff(dateStr) {
+    const master = bookingState.master;
+    if (!master) return false;
+    if (master.working_hours) {
+      try {
+        const wh = typeof master.working_hours === 'string' ? JSON.parse(master.working_hours) : master.working_hours;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const dayOfWeek = new Date(y, m - 1, d).getDay();
+        if (wh && wh[dayOfWeek] && wh[dayOfWeek].enabled === false) {
+          return true;
+        }
+      } catch (e) {}
+    }
+    return false;
+  }
+
+  function initDateStrip(preselectedYmd) {
     const strip = document.getElementById('bookingDateStrip');
     if (!strip) return;
     const today = new Date();
     const pills = [];
+    const dict = I18N[currentLang] || I18N.ru;
+
+    const targetYmd = preselectedYmd || bookingState.selectedDate || formatYMD(today);
 
     for (let i = 0; i < 14; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const ymd = formatYMD(d);
-      const dayName = i === 0 ? 'Сегодня' : (i === 1 ? 'Завтра' : RU_DAYS[d.getDay()]);
+      const dayName = i === 0 ? dict.today : (i === 1 ? dict.tomorrow : dict.daysShort[d.getDay()]);
+      const isSel = (ymd === targetYmd);
+      const isOff = isMasterDayOff(ymd);
 
       pills.push(`
-        <div class="date-pill ${i === 0 ? 'selected' : ''}" data-ymd="${ymd}">
+        <div class="date-pill ${isSel ? 'selected' : ''} ${isOff ? 'day-off' : ''}" data-ymd="${ymd}" ${isOff ? 'title="Выходной"' : ''}>
           <span class="pill-day">${dayName}</span>
           <span class="pill-num">${d.getDate()}</span>
-          <span class="pill-month">${RU_MONTHS[d.getMonth()]}</span>
+          <span class="pill-month">${dict.monthsShort[d.getMonth()]}</span>
         </div>
       `);
     }
 
     strip.innerHTML = pills.join('');
 
-    // Select first day by default
-    bookingState.selectedDate = formatYMD(today);
+    bookingState.selectedDate = targetYmd;
     loadSlotsForDate(bookingState.selectedDate);
 
     strip.querySelectorAll('.date-pill').forEach(pill => {
@@ -375,10 +737,15 @@
   async function loadSlotsForDate(dateStr) {
     const container = document.getElementById('slotsContainer');
     if (!container) return;
-    container.innerHTML = '<div class="no-slots-alert">Расчет свободных окон...</div>';
+    container.innerHTML = `<div class="no-slots-alert">${t('calculatingSlots')}</div>`;
+
+    if (isMasterDayOff(dateStr)) {
+      container.innerHTML = `<div class="no-slots-alert">${t('noSlotsDay')}</div>`;
+      return;
+    }
 
     if (bookingState.selectedServiceIds.size === 0) {
-      container.innerHTML = '<div class="no-slots-alert">Сначала выберите хотя бы одну услугу выше ☝️</div>';
+      container.innerHTML = `<div class="no-slots-alert">${t('firstSelectService')}</div>`;
       return;
     }
 
@@ -429,7 +796,7 @@
     }
 
     if (freeSlots.length === 0) {
-      container.innerHTML = '<div class="no-slots-alert">На этот день все места заняты или мастер отдыхает. Пожалуйста, выберите другую дату выше 📅</div>';
+      container.innerHTML = `<div class="no-slots-alert">${t('noSlotsDay')}</div>`;
       return;
     }
 
@@ -455,9 +822,9 @@
       `;
     };
 
-    html += makeGroup('🌅 Утро', morning);
-    html += makeGroup('☀️ День', afternoon);
-    html += makeGroup('🌙 Вечер', evening);
+    html += makeGroup(t('periodMorning'), morning);
+    html += makeGroup(t('periodAfternoon'), afternoon);
+    html += makeGroup(t('periodEvening'), evening);
 
     container.innerHTML = html;
 
@@ -479,7 +846,8 @@
     const timeLabel = document.getElementById('barSelectedTimeLabel');
     if (bookingState.selectedSlot && bookingState.selectedDate && timeLabel) {
       const [y, m, d] = bookingState.selectedDate.split('-').map(Number);
-      timeLabel.innerText = `${d} ${RU_MONTHS[m - 1]}, в ${bookingState.selectedSlot.start}`;
+      const dict = I18N[currentLang] || I18N.ru;
+      timeLabel.innerText = `${d} ${dict.monthsShort[m - 1]}, в ${bookingState.selectedSlot.start}`;
     }
     checkFormValidity();
   }
@@ -496,6 +864,27 @@
       closeBtn.addEventListener('click', () => {
         const modal = document.getElementById('modalBookingSuccess');
         if (modal) modal.classList.remove('active');
+      });
+    }
+
+    // Setup Copy Manage Link button
+    const copyBtn = document.getElementById('btnCopyManageLink');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const input = document.getElementById('manageLinkInput');
+        if (!input) return;
+        input.select();
+        try {
+          navigator.clipboard.writeText(input.value);
+        } catch (e) {
+          document.execCommand('copy');
+        }
+        const label = document.getElementById('labelCopyBtn');
+        if (label) {
+          const oldText = label.innerText;
+          label.innerText = t('copiedBtn');
+          setTimeout(() => { label.innerText = oldText; }, 2000);
+        }
       });
     }
   }
@@ -523,7 +912,7 @@
     const submitBtn = document.getElementById('btnSubmitBooking');
     if (!submitBtn) return;
     submitBtn.disabled = true;
-    submitBtn.innerText = 'Отправка заявки...';
+    submitBtn.innerText = t('submitting');
 
     try {
       // Anti-bot honeypot verification
@@ -536,7 +925,7 @@
           end_time: bookingState.selectedSlot ? bookingState.selectedSlot.end : '11:00',
           service_names: 'Услуги',
           client_name: 'Клиент'
-        });
+        }, 'sh_demo_bot_trap');
         return;
       }
 
@@ -563,27 +952,38 @@
       const res = await window.HairSupabase.submitBooking(bookingPayload);
 
       if (res.success) {
-        showSuccessModal(bookingPayload);
+        showSuccessModal(bookingPayload, res.manage_token);
       } else {
-        const errorMsg = res.error || 'Не удалось отправить заявку. Попробуйте еще раз или напишите мастеру в WhatsApp напрямую.';
+        const errorMsg = res.error || t('submitFail');
         alert(errorMsg);
         submitBtn.disabled = false;
-        submitBtn.innerText = 'Записаться →';
+        submitBtn.innerText = `${t('submitBtn')} →`;
       }
     } catch (err) {
       console.error('Submit error:', err);
-      alert('Ошибка при отправке заявки: ' + err.message);
+      alert(t('submitError') + err.message);
       submitBtn.disabled = false;
-      submitBtn.innerText = 'Записаться →';
+      submitBtn.innerText = `${t('submitBtn')} →`;
     }
   }
 
-  function showSuccessModal(data) {
+  function showSuccessModal(data, manageToken) {
     document.getElementById('successDateVal').innerText = formatDisplayFullDate(data.date);
     document.getElementById('successTimeVal').innerText = `${data.start_time} - ${data.end_time}`;
     document.getElementById('successServicesVal').innerText = data.service_names;
     document.getElementById('successMasterVal').innerText = bookingState.master.name;
-    document.getElementById('successAddressVal').innerText = [bookingState.master?.city, bookingState.master?.address].filter(Boolean).join(', ') || 'Адрес уточняйте у мастера';
+    document.getElementById('successAddressVal').innerText = [bookingState.master?.city, bookingState.master?.address].filter(Boolean).join(', ') || (currentLang === 'kk' ? 'Мекенжайды шеберден нақтылаңыз' : 'Адрес уточняйте у мастера');
+
+    // Self-Service Manage Link
+    const urlParams = new URLSearchParams(window.location.search);
+    const slug = urlParams.get('m') || 'demo';
+    const manageUrl = `${window.location.origin}${window.location.pathname}?m=${encodeURIComponent(slug)}&manage=${encodeURIComponent(manageToken || '')}`;
+
+    const linkInput = document.getElementById('manageLinkInput');
+    if (linkInput) linkInput.value = manageUrl;
+
+    const directManageBtn = document.getElementById('btnOpenManageDirect');
+    if (directManageBtn) directManageBtn.href = manageUrl;
 
     let cleanMasterPhone = (bookingState.master.phone || '+77011234567').replace(/\D/g, '');
     if (cleanMasterPhone.length === 11 && cleanMasterPhone.startsWith('8')) {
@@ -591,7 +991,10 @@
     } else if (cleanMasterPhone.length === 10 && !cleanMasterPhone.startsWith('7')) {
       cleanMasterPhone = '7' + cleanMasterPhone;
     }
-    const waMsg = `Здравствуйте, ${bookingState.master.name}! Я оставил(а) онлайн-заявку на запись:\n✂️ Услуга: ${data.service_names}\n📅 Дата: ${formatDisplayFullDate(data.date)}\n⏰ Время: ${data.start_time}\n👤 Имя: ${data.client_name}`;
+    
+    const waMsg = currentLang === 'kk'
+      ? `Сәлеметсіз бе, ${bookingState.master.name}! Мен онлайн жазылу өтінішін қалдырдым:\n✂️ Қызмет: ${data.service_names}\n📅 Күні: ${formatDisplayFullDate(data.date)}\n⏰ Уақыты: ${data.start_time}\n👤 Атым: ${data.client_name}`
+      : `Здравствуйте, ${bookingState.master.name}! Я оставил(а) онлайн-заявку на запись:\n✂️ Услуга: ${data.service_names}\n📅 Дата: ${formatDisplayFullDate(data.date)}\n⏰ Время: ${data.start_time}\n👤 Имя: ${data.client_name}`;
     
     const waDirectBtn = document.getElementById('btnOpenMasterWhatsappDirect');
     if (waDirectBtn) {
@@ -601,7 +1004,313 @@
     const successModal = document.getElementById('modalBookingSuccess');
     if (successModal) successModal.classList.add('active');
     const submitBtn = document.getElementById('btnSubmitBooking');
-    if (submitBtn) submitBtn.innerText = 'Заявка отправлена ✓';
+    if (submitBtn) submitBtn.innerText = t('submitted');
+  }
+
+  // ==========================================
+  // CLIENT SELF-SERVICE MANAGEMENT MODULE
+  // ==========================================
+
+  function updateManageStatusBadge(status) {
+    const badge = document.getElementById('manageStatusBadge');
+    if (!badge) return;
+
+    badge.className = 'status-badge ' + (status || 'pending');
+    if (status === 'confirmed') {
+      badge.innerText = t('statusConfirmed');
+    } else if (status === 'cancelled') {
+      badge.innerText = t('statusCancelled');
+    } else if (status === 'completed') {
+      badge.innerText = t('statusCompleted');
+    } else {
+      badge.innerText = t('statusPending');
+    }
+  }
+
+  async function initClientManageView(token) {
+    const stepsWrap = document.getElementById('bookingStepsWrapper');
+    if (stepsWrap) stepsWrap.style.display = 'none';
+
+    const bottomBar = document.querySelector('.bottom-booking-bar');
+    if (bottomBar) bottomBar.style.display = 'none';
+
+    const manageView = document.getElementById('clientManageView');
+    if (manageView) manageView.style.display = 'flex';
+
+    try {
+      const booking = await window.HairSupabase.getBookingByManageToken(token);
+      if (!booking) {
+        if (manageView) {
+          manageView.innerHTML = `
+            <section class="section-card" style="text-align: center; padding: 32px 16px;">
+              <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+              <h2 style="font-size: 18px; font-weight: 700; color: #f87171; margin-bottom: 8px;">${t('manageNotFound')}</h2>
+              <a href="book.html?m=${encodeURIComponent(bookingState.master?.slug || 'demo')}" class="btn-contact whatsapp" style="display: inline-flex; margin-top: 16px; text-decoration: none;">
+                ➕ ${t('btnMakeNewBooking')}
+              </a>
+            </section>
+          `;
+        }
+        return;
+      }
+
+      bookingState.manageBooking = booking;
+
+      // Populate details
+      document.getElementById('manageServicesVal').innerText = booking.service_names || '--';
+      document.getElementById('manageDateVal').innerText = formatDisplayFullDate(booking.date);
+      document.getElementById('manageTimeVal').innerText = `${booking.start_time} - ${booking.end_time}`;
+      document.getElementById('manageClientNameVal').innerText = booking.client_name || '--';
+      document.getElementById('manageMasterVal').innerText = booking.master_name || bookingState.master?.name || 'Sheber';
+
+      updateManageStatusBadge(booking.status);
+
+      // Buttons logic
+      const btnReschedule = document.getElementById('btnManageReschedule');
+      const btnCancel = document.getElementById('btnManageCancel');
+      const btnNew = document.getElementById('btnManageNewBooking');
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const masterSlug = urlParams.get('m') || 'demo';
+      if (btnNew) btnNew.href = `book.html?m=${encodeURIComponent(masterSlug)}`;
+
+      if (booking.status === 'cancelled') {
+        if (btnReschedule) btnReschedule.style.display = 'none';
+        if (btnCancel) btnCancel.style.display = 'none';
+        if (btnNew) btnNew.style.display = 'flex';
+      } else {
+        if (btnReschedule) btnReschedule.style.display = 'flex';
+        if (btnCancel) btnCancel.style.display = 'flex';
+        if (btnNew) btnNew.style.display = 'none';
+      }
+
+      // Wire Cancel button
+      if (btnCancel) {
+        btnCancel.onclick = async () => {
+          if (!confirm(t('confirmCancelPrompt'))) return;
+          btnCancel.disabled = true;
+          const oldLabel = btnCancel.innerText;
+          btnCancel.innerText = t('cancelling');
+
+          try {
+            const res = await window.HairSupabase.cancelBookingByManageToken(token);
+            if (res.success) {
+              booking.status = 'cancelled';
+              bookingState.manageBooking.status = 'cancelled';
+              updateManageStatusBadge('cancelled');
+              btnCancel.style.display = 'none';
+              if (btnReschedule) btnReschedule.style.display = 'none';
+              const rSection = document.getElementById('manageRescheduleSection');
+              if (rSection) rSection.style.display = 'none';
+              if (btnNew) btnNew.style.display = 'flex';
+              alert(t('cancelSuccess'));
+            } else {
+              alert(res.error || 'Ошибка отмены');
+              btnCancel.disabled = false;
+              btnCancel.innerText = oldLabel;
+            }
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка: ' + e.message);
+            btnCancel.disabled = false;
+            btnCancel.innerText = oldLabel;
+          }
+        };
+      }
+
+      // Wire Reschedule button
+      if (btnReschedule) {
+        btnReschedule.onclick = () => {
+          const rSection = document.getElementById('manageRescheduleSection');
+          if (!rSection) return;
+          rSection.style.display = rSection.style.display === 'none' ? 'block' : 'none';
+          if (rSection.style.display === 'block') {
+            initManageRescheduleCalendar(booking);
+          }
+        };
+      }
+
+      const btnCancelResched = document.getElementById('btnCancelRescheduleMode');
+      if (btnCancelResched) {
+        btnCancelResched.onclick = () => {
+          const rSection = document.getElementById('manageRescheduleSection');
+          if (rSection) rSection.style.display = 'none';
+        };
+      }
+
+    } catch (err) {
+      console.error('Error initClientManageView:', err);
+    }
+  }
+
+  function initManageRescheduleCalendar(booking) {
+    const strip = document.getElementById('manageDateStrip');
+    const container = document.getElementById('manageSlotsContainer');
+    const confirmBtn = document.getElementById('btnConfirmReschedule');
+    if (!strip || !container || !confirmBtn) return;
+
+    confirmBtn.disabled = true;
+    bookingState.manageNewSlot = null;
+
+    const today = new Date();
+    const pills = [];
+    const dict = I18N[currentLang] || I18N.ru;
+
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const ymd = formatYMD(d);
+      const dayName = i === 0 ? dict.today : (i === 1 ? dict.tomorrow : dict.daysShort[d.getDay()]);
+
+      pills.push(`
+        <div class="date-pill ${i === 0 ? 'selected' : ''}" data-ymd="${ymd}">
+          <span class="pill-day">${dayName}</span>
+          <span class="pill-num">${d.getDate()}</span>
+          <span class="pill-month">${dict.monthsShort[d.getMonth()]}</span>
+        </div>
+      `);
+    }
+
+    strip.innerHTML = pills.join('');
+    bookingState.manageNewDate = formatYMD(today);
+    loadManageSlotsForDate(bookingState.manageNewDate, booking);
+
+    strip.querySelectorAll('.date-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        strip.querySelectorAll('.date-pill').forEach(p => p.classList.remove('selected'));
+        pill.classList.add('selected');
+        const ymd = pill.getAttribute('data-ymd');
+        bookingState.manageNewDate = ymd;
+        bookingState.manageNewSlot = null;
+        confirmBtn.disabled = true;
+        loadManageSlotsForDate(ymd, booking);
+      });
+    });
+
+    confirmBtn.onclick = async () => {
+      if (!bookingState.manageNewDate || !bookingState.manageNewSlot) return;
+      confirmBtn.disabled = true;
+      confirmBtn.innerText = t('submitting');
+
+      try {
+        const res = await window.HairSupabase.rescheduleBookingByManageToken(
+          booking.manage_token,
+          bookingState.manageNewDate,
+          bookingState.manageNewSlot.start,
+          bookingState.manageNewSlot.end,
+          booking.duration_min || 60
+        );
+
+        if (res.success) {
+          booking.date = bookingState.manageNewDate;
+          booking.start_time = bookingState.manageNewSlot.start;
+          booking.end_time = bookingState.manageNewSlot.end;
+          booking.status = 'pending';
+
+          document.getElementById('manageDateVal').innerText = formatDisplayFullDate(booking.date);
+          document.getElementById('manageTimeVal').innerText = `${booking.start_time} - ${booking.end_time}`;
+          updateManageStatusBadge('pending');
+
+          const rSection = document.getElementById('manageRescheduleSection');
+          if (rSection) rSection.style.display = 'none';
+
+          alert(t('rescheduleSuccess'));
+        } else {
+          alert(res.error || 'Ошибка переноса');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Ошибка: ' + e.message);
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerText = t('btnConfirmNewTime');
+      }
+    };
+  }
+
+  async function loadManageSlotsForDate(dateStr, booking) {
+    const container = document.getElementById('manageSlotsContainer');
+    if (!container) return;
+    container.innerHTML = `<div class="no-slots-alert">${t('calculatingSlots')}</div>`;
+
+    const masterId = booking.master_id || (bookingState.master ? bookingState.master.id : null);
+    const busySlots = await window.HairSupabase.getBusySlots(masterId, dateStr);
+
+    const master = bookingState.master || {};
+    const startHour = Number(master.work_start_hour) || 9;
+    const endHour = Number(master.work_end_hour) || 21;
+    const stepMin = Number(master.slot_step_min) || 30;
+    const duration = Number(booking.duration_min) || 60;
+
+    const now = new Date();
+    const isToday = (dateStr === formatYMD(now));
+    const currentMinutes = now.getHours() * 60 + now.getMinutes() + 15;
+
+    const freeSlots = [];
+
+    for (let m = startHour * 60; m <= (endHour * 60) - duration; m += stepMin) {
+      if (isToday && m < currentMinutes) continue;
+
+      const slotStart = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const slotEnd = addMinutesToTime(slotStart, duration);
+
+      const slotStartMin = m;
+      const slotEndMin = m + duration;
+
+      const isOverlapping = Array.isArray(busySlots) && busySlots.some(busy => {
+        const bStart = timeToMinutes(busy.start_time);
+        const bEnd = timeToMinutes(busy.end_time);
+        return Math.max(slotStartMin, bStart) < Math.min(slotEndMin, bEnd);
+      });
+
+      if (!isOverlapping) {
+        freeSlots.push({ start: slotStart, end: slotEnd });
+      }
+    }
+
+    if (freeSlots.length === 0) {
+      container.innerHTML = `<div class="no-slots-alert">${t('noSlotsDay')}</div>`;
+      return;
+    }
+
+    const morning = freeSlots.filter(s => timeToMinutes(s.start) < 12 * 60);
+    const afternoon = freeSlots.filter(s => timeToMinutes(s.start) >= 12 * 60 && timeToMinutes(s.start) < 17 * 60);
+    const evening = freeSlots.filter(s => timeToMinutes(s.start) >= 17 * 60);
+
+    let html = '';
+    const makeGroup = (title, list) => {
+      if (list.length === 0) return '';
+      return `
+        <div class="slots-period-group">
+          <div class="period-title">${title}</div>
+          <div class="slots-grid">
+            ${list.map(s => `
+              <button type="button" class="slot-btn" data-slot="${s.start}" data-slot-end="${s.end}">${s.start}</button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    };
+
+    html += makeGroup(t('periodMorning'), morning);
+    html += makeGroup(t('periodAfternoon'), afternoon);
+    html += makeGroup(t('periodEvening'), evening);
+
+    container.innerHTML = html;
+
+    const confirmBtn = document.getElementById('btnConfirmReschedule');
+
+    container.querySelectorAll('.slot-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        bookingState.manageNewSlot = {
+          start: btn.getAttribute('data-slot'),
+          end: btn.getAttribute('data-slot-end')
+        };
+        if (confirmBtn) confirmBtn.disabled = false;
+      });
+    });
   }
 
 })();
